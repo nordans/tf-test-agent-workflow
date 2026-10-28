@@ -93,9 +93,9 @@ scans the final runtime image. HIGH/CRITICAL image findings fail the check.
 
 Changed modules require checked-in tests and detection of a source mutation.
 Missing tests and undetected sampled mutations in unchanged modules remain
-visible in verification.json. All eight modules have test suites. The existing
-network suite still misses the sampled mutations; a passing CI result does not
-claim complete behavioral coverage.
+visible in verification.json. All eight modules have test suites and currently
+detect a sampled source mutation. A passing CI result does not claim complete
+behavioral coverage.
 The terraform-verification artifact contains test, compatibility and image reports.
 
 The original standalone module planner remains available with

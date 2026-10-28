@@ -157,8 +157,7 @@ Offline checks run Ruff, pytest, Actionlint/ShellCheck, Betterleaks and pip-audi
 Pinned actions and checksum-verified tools are used. Terraform CI runs all existing
 module suites, requires tests and a detected mutation for changed modules, and
 reports missing tests or undetected mutations in unchanged modules. All eight
-modules have checked-in suites. Network's existing suite
-does not detect the sampled mutations; this is a recorded coverage-work item.
+modules have checked-in suites and currently detect a sampled source mutation.
 Passing CI does not mean full repository coverage.
 
 check_modules.py separately validates all eight modules and the stack against
@@ -194,14 +193,16 @@ loads both skills; the independent runner verifies the new suite and updated
 existing suite, then reruns after patch application. The recorded example is in
 [docs/examples/generic-pr-run.json](docs/examples/generic-pr-run.json). It is local
 evidence, not a claim that the new workflow has already run from trusted main.
-Synthetic sources are under tests/fixtures. After merge, a real GitHub PR must
-confirm the multi-module publication path.
+Synthetic sources are under tests/fixtures. The actual four-module publication
+path was subsequently verified in [PR #16](https://github.com/nordans/tf-test-agent-workflow/pull/16):
+all modules returned no_change_verified with mutation detection and an empty patch.
 
 The existing data-factory, databricks-workspace, function-app and private-endpoint
 modules were bootstrapped together with real Gemini calls, followed by explicit
 reviewer edits and independent verification. Their 11 new scenarios all passed
 and each suite detected a source mutation. The complete repository then passed
-22 native test runs across eight modules; network's sampled mutation gap remains.
+22 native test runs across eight modules; network's sampled mutation gap remained
+at that checkpoint.
 See [the bootstrap record](docs/examples/four-module-bootstrap.json) for decisions,
 skill/tool usage, failed attempts, review feedback, edits and execution results.
 
@@ -213,6 +214,24 @@ Local follow-ups used a paced transport wrapper and human feedback. Review also
 restored assertions removed during a model repair, split them into bounded runs,
 and added missing resource wiring checks. These are assisted, reviewed results,
 not evidence that the agent autonomously produced complete coverage on one try.
+
+Network's original three scenarios used fixed subnet inputs and checked counts,
+names, endpoint presence and CIDR validation. Freezing NSG/association iteration to
+that map still passed. Four added scenarios exercise caller overrides, different
+keys, a third subnet, the empty map, resource references and outputs. Network now
+passes seven scenarios and detects a valid variable-wiring mutation; all eight
+modules pass 26 scenarios and detect a sampled mutation. Six additional controlled
+regressions passed the old suite and are rejected by the expanded suite. Some
+produce configuration errors instead of assertion failures; those are explicitly
+not counted as strict mutation detection. See
+[the network regression record](docs/examples/network-coverage.json).
+
+Computed mock IDs in these network tests are shared per resource type. They verify
+nominal output/reference contracts and key sets, but do not distinguish every
+possible cross-instance ID swap. Alternate caller keys catch hardcoded key names.
+The generic variable-freezing mutator also does not reconstruct defaults supplied
+by Terraform type conversion, such as optional service_endpoints. A control that
+loses such a default can become invalid and is never credited as detected.
 
 Existing configuration still warrants owner review: data-factory,
 databricks-workspace and function-app default public network access to true;
@@ -241,8 +260,8 @@ a useful subset, not arbitrary refactors. Tests cannot prove Azure acceptance,
 effective permissions, service behavior, networking, deployment success or script
 logic. Mocked IDs establish wiring only. Generated tests need human review.
 
-Next work is to improve remaining weak spots, especially network mutation
-sensitivity, and confirm the final GitHub example and documentation. Model repair
+Next work is to confirm the final GitHub infrastructure-change example and review
+remaining coverage gaps, including type-preserving source mutations. Model repair
 needs stronger plan-to-assertion checks and more precise structural diagnostics;
 production transport still needs bounded transient-error handling. With more
 modules/teams/repositories, use dependency impact analysis,
