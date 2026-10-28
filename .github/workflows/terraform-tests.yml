@@ -1,0 +1,42 @@
+name: Terraform mocked tests
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  log-analytics-workspace:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.12'
+
+      - name: Install pinned dependencies
+        run: python -m pip install --disable-pip-version-check -r requirements.txt
+
+      - name: Build approved Terraform and provider runtime
+        run: python -B -m test_agent.build_runtime
+
+      - name: Verify reviewed tests and retention mutation
+        run: python -B -m test_agent.verify > verification.json
+
+      - name: Upload verification results
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: log-analytics-workspace-verification
+          path: verification.json
+          if-no-files-found: warn
+          retention-days: 7

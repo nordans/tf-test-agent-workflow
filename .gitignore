@@ -7,3 +7,4 @@ crash.log
 .venv/
 __pycache__/
 *.py[cod]
+.agent-output/
