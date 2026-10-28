@@ -136,7 +136,9 @@ One detected mutation demonstrates sensitivity, not comprehensive coverage.
 
 Containers run as UID 65532, without network, with read-only root/input, all
 capabilities dropped, no-new-privileges and CPU/RAM/PID limits. Writable storage
-is ephemeral noexec tmpfs. Only bounded Terraform/test snapshots are mounted;
+is ephemeral noexec tmpfs. Formatting operates on writable copies in that tmpfs;
+the input mount remains read-only. Terraform CI exercises both runner entry points
+with unformatted inputs. Only bounded Terraform/test snapshots are mounted;
 scripts, home directories and the Docker socket are not. The Docker CLI receives
 an environment allowlist excluding Gemini, GitHub and Azure secrets. Host kernel
 sharing remains a limitation of this boundary.

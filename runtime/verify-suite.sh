@@ -4,6 +4,7 @@ cp /input/*.tf /work/
 cp /input/.terraform.lock.hcl /work/.terraform.lock.hcl
 mkdir /work/tests
 cp /input/tests/*.tftest.hcl /work/tests/
+chmod u+w /work/*.tf /work/tests/*.tftest.hcl
 printf '{"runner_stage":"format"}\n'
 terraform fmt -no-color -recursive /work >/work/fmt.log 2>&1
 for test in /work/tests/*.tftest.hcl; do

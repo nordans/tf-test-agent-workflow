@@ -37,6 +37,11 @@ jobs:
       - name: Build approved Terraform and provider runtime
         run: uv run --locked --no-dev python -B -m test_agent.build_runtime
 
+      - name: Check native runner formatting with readonly inputs
+        env:
+          TF_AGENT_DOCKER_TESTS: '1'
+        run: uv run --locked --no-dev python -B -m unittest discover -s tests -p test_sandbox.py
+
       - name: Run module suites and source mutation controls
         env:
           TF_TEST_BASE: ${{ github.event.pull_request.base.sha }}

@@ -30,6 +30,39 @@ def events(*extra):
 
 
 class SandboxTests(unittest.TestCase):
+    @unittest.skipUnless(
+        os.environ.get("TF_AGENT_DOCKER_TESTS") == "1",
+        "Set TF_AGENT_DOCKER_TESTS=1 after building the approved Docker runtime.",
+    )
+    def test_native_runner_formats_readonly_staged_tests(self):
+        from test_agent.suite_runner import SuiteRunner
+
+        original = (ROOT / "tests/fixtures/ai_search_valid.tftest.hcl").read_text()
+        unformatted = original.replace("command = plan", "command=plan")
+        self.assertNotEqual(original, unformatted)
+        sources = {
+            "modules/ai-search/main.tf": (
+                ROOT / "tests/fixtures/ai_search_module/main.tf"
+            ).read_text()
+        }
+        report, tests = SuiteRunner().execute(
+            sources, {"tests/generated.tftest.hcl": unformatted}
+        )
+        self.assertTrue(report["passed"], report)
+        self.assertNotEqual(tests["tests/generated.tftest.hcl"], unformatted)
+
+        legacy_hcl = HCL.replace("command = plan", "command=plan")
+        self.assertNotEqual(HCL, legacy_hcl)
+        sources = {
+            f"modules/log-analytics-workspace/{path.name}": path.read_text()
+            for path in (ROOT / "tests/fixtures/log_analytics_module").glob("*.tf")
+        }
+        report, formatted = DockerRunner().execute(
+            sources, validate_proposal(legacy_hcl)
+        )
+        self.assertTrue(report["passed"], report)
+        self.assertNotEqual(formatted, legacy_hcl)
+
     def test_container_has_no_network_no_root_and_readonly_input(self):
         args = container_args("sha256:" + "a" * 64, ROOT, "controlled-name")
         for flag in (

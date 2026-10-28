@@ -5,6 +5,7 @@ cp /input/*.tf /work/
 cp /opt/provider/azurerm.lock.hcl /work/.terraform.lock.hcl
 mkdir /work/tests
 cp /input/generated.tftest.hcl /work/tests/generated.tftest.hcl
+chmod u+w /work/tests/generated.tftest.hcl
 
 printf '{"runner_stage":"format"}\n'
 if ! terraform fmt -no-color tests/generated.tftest.hcl >/work/fmt.log 2>&1; then
