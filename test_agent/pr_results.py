@@ -13,6 +13,14 @@ from test_agent.pr_context import PRIdentity
 MAX_JSON_BYTES = 1_048_576
 
 
+def same_test_content(left: str | None, right: str | None) -> bool:
+    return (
+        left is not None
+        and right is not None
+        and left.replace("\r\n", "\n") == right.replace("\r\n", "\n")
+    )
+
+
 class Analysis(StrictModel):
     mode: Literal["analysis_only"]
     module: str
