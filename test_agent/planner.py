@@ -6,7 +6,7 @@ from test_agent.context import SKILL_NAME, AgentError, AnalysisContext
 from test_agent.gemini import MODEL
 from test_agent.models import TestPlan
 
-MAX_ROUNDS = 3
+MAX_ROUNDS = 4
 
 
 def declaration(name: str, description: str, properties: dict) -> dict:
@@ -50,7 +50,7 @@ def run_planner(context: AnalysisContext, client) -> dict:
             "parts": [{"text": f"Plan tests for module {context.module}."}],
         }
     ]
-    completed = []
+    completed, rejected_plans = [], 0
     for _ in range(MAX_ROUNDS):
         # Discovery tools are each usable once. Submission is exposed only after both.
         allowed = [
@@ -62,7 +62,9 @@ def run_planner(context: AnalysisContext, client) -> dict:
             context.instructions, contents, [definitions[name] for name in allowed]
         )
         parts = content.get("parts", [])
-        if any(not isinstance(part, dict) for part in parts):
+        if not isinstance(parts, list) or any(
+            not isinstance(part, dict) for part in parts
+        ):
             raise AgentError("Model response contains malformed parts.")
         calls = [part["functionCall"] for part in parts if "functionCall" in part]
         if not calls or len(calls) > len(allowed):
@@ -96,28 +98,43 @@ def run_planner(context: AnalysisContext, client) -> dict:
             else:
                 try:
                     plan = TestPlan.model_validate(args)
-                except ValidationError:
-                    raise AgentError(
-                        "Model submitted a plan that does not match the result contract."
-                    ) from None
-                context.validate_evidence(plan)
-                return {
-                    "mode": "analysis_only",
-                    "module": context.module,
-                    "model": MODEL,
-                    "tests_executed": False,
-                    "tool_calls": completed + [name],
-                    "existing_test_files": [
-                        path for path in context.files if path.endswith(".tftest.hcl")
-                    ],
-                    "provenance": context.provenance(),
-                    "usage": dict(client.usage),
-                    "plan": plan.model_dump(),
-                }
+                except ValidationError as error:
+                    rejected_plans += 1
+                    if rejected_plans >= 2:
+                        raise AgentError(
+                            "Model submitted two plans that violate the result contract."
+                        ) from None
+                    result = {
+                        "accepted": False,
+                        "errors": [
+                            {"field": ".".join(map(str, e["loc"])), "message": e["msg"]}
+                            for e in error.errors(
+                                include_input=False, include_url=False
+                            )[:4]
+                        ],
+                        "instruction": "Correct the contract once. no_change requires an empty test_cases list; existing coverage belongs in summary.",
+                    }
+                else:
+                    context.validate_evidence(plan)
+                    return {
+                        "mode": "analysis_only",
+                        "module": context.module,
+                        "model": MODEL,
+                        "tests_executed": False,
+                        "tool_calls": completed + [name],
+                        "existing_test_files": [
+                            path
+                            for path in context.files
+                            if path.endswith(".tftest.hcl")
+                        ],
+                        "provenance": context.provenance(),
+                        "usage": dict(client.usage),
+                        "plan": plan.model_dump(),
+                    }
             completed.append(name)
             response = {"name": name, "response": result}
             if "id" in call:
                 response["id"] = call["id"]
             results.append({"functionResponse": response})
         contents.append({"role": "user", "parts": results})
-    raise AgentError("Planner reached its three-request limit without a valid plan.")
+    raise AgentError("Planner reached its four-request limit without a valid plan.")

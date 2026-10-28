@@ -1,51 +1,85 @@
 ---
 name: terraform-unit-testing
-description: Turn a supplied Terraform module test plan into mocked native tests and use the verification tool to check them. Use after module analysis when test authoring is authorized.
+description: Create or update native mocked Terraform tests from module source and an evidence-backed plan, preserving existing checks and handing proposals to the independent verifier.
 ---
 
 # Native Terraform unit testing
 
-In PR mode, use the actual default from the after source rather than assuming 30.
-Retain the existing test's run names, variables, mocks and unrelated assertions.
-For a changed literal retention default, update only that default equality.
-The caller may expose submit_proposal instead of verify_module: in that mode,
-submit after an accepted proposal and let the separate verifier run the tests.
+Work on the caller-selected module, including newly added modules. Derive resource
+types, inputs, defaults, validations, collections, conditional branches and outputs
+from its files. A familiar module name is not required. Follow the supplied plan;
+report unsupported behavior rather than inventing infrastructure requirements.
 
-For this milestone, propose one complete `tests/generated.tftest.hcl` file through
-`propose_test_file`. The tool owns the path. Write HCL, not Markdown fences.
+In PR mode, use propose_test_files with complete HCL for each changed allowed path.
+Omitted files remain unchanged. Prefer extending an existing test or adding the
+fixed generated test path. Do not duplicate existing sufficient coverage.
+The standalone bootstrap may expose propose_test_file instead; use only tools
+actually offered. Submit after an accepted proposal. Execution is independent.
 
-Use only these top-level blocks: one `mock_provider "azurerm"`, one `variables`,
-and one to six named `run` blocks. Each run must set `command = plan` explicitly
-and contain assertions with `condition` and `error_message`. The supported run
-attributes are command, variables and assert. Do not load modules, providers,
-external mock files, overrides or other sources. Only the `length` function is
-supported in test expressions by this milestone's policy.
+Use only mock_provider, variables and named run blocks. Every declared provider
+must be mocked, including external. All runs explicitly set command = plan.
+Do not load test modules, real providers, external mocks, overrides or state.
+Use literal test inputs. Safe pure expression functions are allowed; filesystem,
+environment, provider-defined and execution functions are forbidden.
 
-Set `override_during = plan` on the mock provider. Inside it, use one
-`mock_resource "azurerm_log_analytics_workspace"` with `defaults` containing only
-a deterministic `id`, for example
-`/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-test/providers/Microsoft.OperationalInsights/workspaces/log-test`.
-Mock computed ID only; do not mock retention, tags or SKU, whose wiring is tested.
-At plan time this makes `output.id` comparable to the known fake ID.
+Use override_during = plan when computed values are needed in plan assertions.
+The PR caller supplies schema-derived computed_mock_fields. Mock only these
+fields, using valid deterministic IDs when downstream resources parse an ID.
+For nested identity blocks, mock computed principal_id or tenant_id, never type.
+Do not mock configurable behavior such as SKU, tags, TLS or public network flags.
+For external data, mock its computed result map including every referenced key.
+Its configured program must never execute. Mocked results do not test the script.
 
-Set name, resource_group_name and location to literal test values in the global
-variables block. Leave retention and tags unset in the default run. Assert the
-actual source default retention (30 in the original module), SKU PerGB2018 and
-empty tags. Add an override run
-with retention_in_days = 90 and literal tags, and assert their propagation to the
-resource. Include the output check from the plan. Compare resource/output values
-to concrete expectations, not expressions that merely equal themselves.
-For empty tags, use `length(azurerm_log_analytics_workspace.this.tags) == 0`;
-equality with `{}` can fail due to Terraform collection/object type differences.
+This example shows HCL nesting only. Use the actual resource and output names
+from the selected module, not the example names. mock_resource and mock_data
+belong inside mock_provider; override_during belongs inside mock_provider too.
 
-The verifier runs a second, temporary source copy with retention wired to constant
-30. The override assertion must fail there; a test suite that also passes that
-mutant is not accepted. This experiment never changes the infrastructure proposal.
+~~~hcl
+mock_provider "azurerm" {
+  override_during = plan
+  mock_resource "azurerm_resource_group" {
+    defaults = {
+      id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-test"
+    }
+  }
+}
 
-Call `verify_module` after an accepted proposal. Its result is authoritative for
-execution status; raw model text is not. On failure, inspect the data and either
-repair the test within the proposal budget or submit the failure. Do not invent
-variable validation or lower an expected security property to force a green run.
-An ordinary failed assertion ends autonomous repair and must be submitted for
-human review. Previously accepted assertion conditions cannot be removed or
-changed in a later proposal; repair is restricted to setup or additive checks.
+variables {
+  name     = "rg-test"
+  location = "westeurope"
+}
+
+run "output_wiring" {
+  command = plan
+  assert {
+    condition     = output.id == azurerm_resource_group.this.id
+    error_message = "The output must expose the resource ID."
+  }
+}
+~~~
+
+Assert concrete expected behavior rather than comparing a value with itself.
+Cover relevant defaults and caller overrides, empty/populated collections and
+conditional branches. Prefer small representative cases with a clear purpose.
+Implement the planned output-wiring cases as well as resource assertions. Use
+schema-approved computed mocks when an output must be known during plan.
+For empty maps use length(value) == 0 to avoid collection/object type differences.
+Use expect_failures only for validations actually present in the module.
+
+Keep existing run names, inputs, expected validation failures, mock values and
+unrelated conditions. A changed scalar source default may justify updating its
+old equality when the run does not override that input. Boolean expectation
+changes and other unsupported rewrites require human review. Report weakened
+security behavior; never weaken a check merely to make the suite pass.
+
+The verifier runs every test file together and then tries at most three temporary
+source mutations. It can freeze variable wiring to a known literal input or flip
+a configured Boolean. Representative override/wiring assertions should detect
+real regressions. A provider crash or invalid setup is not mutation detection.
+One detected mutation is evidence of sensitivity, not a coverage percentage or
+proof that all assertions are useful. Never change infrastructure to satisfy it.
+
+Structural rejection may be corrected within the proposal budget. Runtime
+assertion failures end autonomous authoring and require review; do not delete
+failed checks or claim success. Mocked plans do not establish Azure API behavior,
+permissions, deployment success or runtime connectivity.

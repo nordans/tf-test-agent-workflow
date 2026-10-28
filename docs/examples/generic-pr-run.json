@@ -1,0 +1,671 @@
+{
+  "execution": "Local synthetic Git PR; not a GitHub workflow or actual PR number.",
+  "scenario": "Add an unregistered ai-search module without tests and change workspace retention from 30 to 60.",
+  "source_fixtures": [
+    "tests/fixtures/ai_search_module",
+    "tests/fixtures/log_analytics_module",
+    "tests/fixtures/log_analytics_valid.tftest.hcl"
+  ],
+  "revisions": {
+    "base": "50ea268bc24d318bcccef5cf7704ea5486a374c7",
+    "head": "9280b98fc7b03264b912fd65de9c8bad53336b6c",
+    "applied_head": "a76ef76f0aeea139d2f92d5a0dacb4965312c666"
+  },
+  "first_run": {
+    "status": "verified",
+    "modules": [
+      {
+        "module": "ai-search",
+        "decision": "add_tests",
+        "summary": "Plan native Terraform tests for the ai-search module to cover default SKU configuration, custom SKU overrides, tag propagation, and output wiring.",
+        "analysis_skill": "terraform-change-analysis",
+        "authoring_skill": "terraform-unit-testing",
+        "analysis_tools": [
+          "load_skill",
+          "read_module",
+          "submit_test_plan"
+        ],
+        "authoring_tools": [
+          "load_skill",
+          "propose_test_files",
+          "propose_test_files",
+          "submit_proposal"
+        ],
+        "usage": {
+          "promptTokenCount": 15344,
+          "candidatesTokenCount": 1620,
+          "totalTokenCount": 16964
+        },
+        "status": "verified",
+        "baseline": null,
+        "existing": null,
+        "candidate": {
+          "image_id": "sha256:b675b4301eeb66ee15c0ff481f6774b9d3c86f81365ec85c0b25cde17d58862c",
+          "terraform": {
+            "passed": true,
+            "stage": "test",
+            "runs": [
+              {
+                "file": "tests/generated.tftest.hcl",
+                "name": "test_default_sku",
+                "status": "pass"
+              },
+              {
+                "file": "tests/generated.tftest.hcl",
+                "name": "test_sku_override",
+                "status": "pass"
+              },
+              {
+                "file": "tests/generated.tftest.hcl",
+                "name": "test_tags",
+                "status": "pass"
+              },
+              {
+                "file": "tests/generated.tftest.hcl",
+                "name": "test_output_id",
+                "status": "pass"
+              }
+            ],
+            "summary": {
+              "status": "pass",
+              "passed": 4,
+              "failed": 0,
+              "errored": 0,
+              "skipped": 0
+            },
+            "assertion_failure": false,
+            "diagnostics": []
+          },
+          "mutation": {
+            "executed": true,
+            "detected": true,
+            "attempts": [
+              {
+                "path": "modules/ai-search/main.tf",
+                "description": "Freeze sku wiring from var.sku to a known literal input.",
+                "detected": true,
+                "terraform": {
+                  "passed": false,
+                  "stage": "test",
+                  "runs": [
+                    {
+                      "file": "tests/generated.tftest.hcl",
+                      "name": "test_default_sku",
+                      "status": "pass"
+                    },
+                    {
+                      "file": "tests/generated.tftest.hcl",
+                      "name": "test_sku_override",
+                      "status": "fail"
+                    },
+                    {
+                      "file": "tests/generated.tftest.hcl",
+                      "name": "test_tags",
+                      "status": "pass"
+                    },
+                    {
+                      "file": "tests/generated.tftest.hcl",
+                      "name": "test_output_id",
+                      "status": "pass"
+                    }
+                  ],
+                  "summary": {
+                    "status": "fail",
+                    "passed": 3,
+                    "failed": 1,
+                    "errored": 0,
+                    "skipped": 0
+                  },
+                  "assertion_failure": true,
+                  "diagnostics": [
+                    {
+                      "summary": "Test assertion failed",
+                      "detail": "Expected SKU to be overridden to 'standard'."
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          "passed": true,
+          "suite_sha256": "2b3a189455a2a271f3870ac1f05cd0531f704707ae899af470d2b76b953a1c36"
+        },
+        "proposed_edits": {
+          "tests/generated.tftest.hcl": "mock_provider \"azurerm\" {\n  override_during = plan\n  mock_resource \"azurerm_search_service\" {\n    defaults = {\n      id = \"/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-test/providers/Microsoft.Search/searchServices/test-search\"\n    }\n  }\n}\n\nvariables {\n  name = \"test-search\"\n}\n\nrun \"test_default_sku\" {\n  command = plan\n\n  assert {\n    condition     = azurerm_search_service.this.sku == \"basic\"\n    error_message = \"Expected default SKU to be 'basic'.\"\n  }\n\n  assert {\n    condition     = azurerm_search_service.this.public_network_access_enabled == false\n    error_message = \"Expected public network access to be disabled by default.\"\n  }\n}\n\nrun \"test_sku_override\" {\n  command = plan\n\n  variables {\n    sku = \"standard\"\n  }\n\n  assert {\n    condition     = azurerm_search_service.this.sku == \"standard\"\n    error_message = \"Expected SKU to be overridden to 'standard'.\"\n  }\n}\n\nrun \"test_tags\" {\n  command = plan\n\n  variables {\n    tags = {\n      Environment = \"test\"\n    }\n  }\n\n  assert {\n    condition     = azurerm_search_service.this.tags[\"Environment\"] == \"test\"\n    error_message = \"Expected tags to be correctly propagated.\"\n  }\n}\n\nrun \"test_output_id\" {\n  command = plan\n\n  assert {\n    condition     = output.id == azurerm_search_service.this.id\n    error_message = \"Expected output 'id' to match the search service resource ID.\"\n  }\n}\n"
+        }
+      },
+      {
+        "module": "log-analytics-workspace",
+        "decision": "update_tests",
+        "summary": "The default value of retention_in_days was updated from 30 to 60 in variables.tf. The existing test suite in generated.tftest.hcl asserts retention_in_days == 30 under the defaults run, which now fails against the updated default. We need to update the test expectation to reflect the new default value of 60.",
+        "analysis_skill": "terraform-change-analysis",
+        "authoring_skill": "terraform-unit-testing",
+        "analysis_tools": [
+          "load_skill",
+          "read_module",
+          "submit_test_plan"
+        ],
+        "authoring_tools": [
+          "load_skill",
+          "propose_test_files",
+          "submit_proposal"
+        ],
+        "usage": {
+          "promptTokenCount": 19529,
+          "candidatesTokenCount": 1012,
+          "totalTokenCount": 20541
+        },
+        "status": "verified",
+        "baseline": {
+          "passed": true,
+          "stage": "test",
+          "runs": [
+            {
+              "file": "tests/generated.tftest.hcl",
+              "name": "defaults",
+              "status": "pass"
+            },
+            {
+              "file": "tests/generated.tftest.hcl",
+              "name": "overrides",
+              "status": "pass"
+            },
+            {
+              "file": "tests/generated.tftest.hcl",
+              "name": "output_id",
+              "status": "pass"
+            }
+          ],
+          "summary": {
+            "status": "pass",
+            "passed": 3,
+            "failed": 0,
+            "errored": 0,
+            "skipped": 0
+          },
+          "assertion_failure": false,
+          "diagnostics": []
+        },
+        "existing": {
+          "passed": false,
+          "stage": "test",
+          "runs": [
+            {
+              "file": "tests/generated.tftest.hcl",
+              "name": "defaults",
+              "status": "fail"
+            },
+            {
+              "file": "tests/generated.tftest.hcl",
+              "name": "overrides",
+              "status": "pass"
+            },
+            {
+              "file": "tests/generated.tftest.hcl",
+              "name": "output_id",
+              "status": "pass"
+            }
+          ],
+          "summary": {
+            "status": "fail",
+            "passed": 2,
+            "failed": 1,
+            "errored": 0,
+            "skipped": 0
+          },
+          "assertion_failure": true,
+          "diagnostics": [
+            {
+              "summary": "Test assertion failed",
+              "detail": "Default retention must be 30."
+            }
+          ]
+        },
+        "candidate": {
+          "image_id": "sha256:b675b4301eeb66ee15c0ff481f6774b9d3c86f81365ec85c0b25cde17d58862c",
+          "terraform": {
+            "passed": true,
+            "stage": "test",
+            "runs": [
+              {
+                "file": "tests/generated.tftest.hcl",
+                "name": "defaults",
+                "status": "pass"
+              },
+              {
+                "file": "tests/generated.tftest.hcl",
+                "name": "overrides",
+                "status": "pass"
+              },
+              {
+                "file": "tests/generated.tftest.hcl",
+                "name": "output_id",
+                "status": "pass"
+              }
+            ],
+            "summary": {
+              "status": "pass",
+              "passed": 3,
+              "failed": 0,
+              "errored": 0,
+              "skipped": 0
+            },
+            "assertion_failure": false,
+            "diagnostics": []
+          },
+          "mutation": {
+            "executed": true,
+            "detected": true,
+            "attempts": [
+              {
+                "path": "modules/log-analytics-workspace/main.tf",
+                "description": "Freeze retention_in_days wiring from var.retention_in_days to a known literal input.",
+                "detected": true,
+                "terraform": {
+                  "passed": false,
+                  "stage": "test",
+                  "runs": [
+                    {
+                      "file": "tests/generated.tftest.hcl",
+                      "name": "defaults",
+                      "status": "pass"
+                    },
+                    {
+                      "file": "tests/generated.tftest.hcl",
+                      "name": "overrides",
+                      "status": "fail"
+                    },
+                    {
+                      "file": "tests/generated.tftest.hcl",
+                      "name": "output_id",
+                      "status": "pass"
+                    }
+                  ],
+                  "summary": {
+                    "status": "fail",
+                    "passed": 2,
+                    "failed": 1,
+                    "errored": 0,
+                    "skipped": 0
+                  },
+                  "assertion_failure": true,
+                  "diagnostics": [
+                    {
+                      "summary": "Test assertion failed",
+                      "detail": "Retention must follow the caller override."
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          "passed": true,
+          "suite_sha256": "5a2832a813bd55eca5a3e3530e9a19b69a4feb78abdf97e82f855e62cd9bf137"
+        },
+        "proposed_edits": {
+          "tests/generated.tftest.hcl": "# Hand-written fixture for policy and sandbox checks, not an agent-generated artifact.\nmock_provider \"azurerm\" {\n  override_during = plan\n  mock_resource \"azurerm_log_analytics_workspace\" {\n    defaults = {\n      id = \"/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-test/providers/Microsoft.OperationalInsights/workspaces/log-test\"\n    }\n  }\n}\n\nvariables {\n  name                = \"log-test\"\n  resource_group_name = \"rg-test\"\n  location            = \"westeurope\"\n}\n\nrun \"defaults\" {\n  command = plan\n\n  assert {\n    condition     = azurerm_log_analytics_workspace.this.retention_in_days == 60\n    error_message = \"Default retention must be 60.\"\n  }\n  assert {\n    condition     = azurerm_log_analytics_workspace.this.sku == \"PerGB2018\"\n    error_message = \"The configured SKU must be preserved.\"\n  }\n  assert {\n    condition     = length(azurerm_log_analytics_workspace.this.tags) == 0\n    error_message = \"Default tags must be empty.\"\n  }\n}\n\nrun \"overrides\" {\n  command = plan\n  variables {\n    retention_in_days = 90\n    tags = {\n      environment = \"test\"\n    }\n  }\n  assert {\n    condition     = azurerm_log_analytics_workspace.this.retention_in_days == 90\n    error_message = \"Retention must follow the caller override.\"\n  }\n  assert {\n    condition     = azurerm_log_analytics_workspace.this.tags[\"environment\"] == \"test\"\n    error_message = \"Tags must follow caller input.\"\n  }\n}\n\nrun \"output_id\" {\n  command = plan\n  assert {\n    condition     = output.id == \"/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-test/providers/Microsoft.OperationalInsights/workspaces/log-test\"\n    error_message = \"The output must expose the resource ID.\"\n  }\n}\n"
+        }
+      }
+    ]
+  },
+  "after_patch_application": {
+    "status": "no_change_verified",
+    "modules": [
+      {
+        "module": "ai-search",
+        "decision": "no_change",
+        "summary": "The existing generated test file thoroughly covers all inputs, defaults, conditional properties, and outputs of the ai-search module. No additional test cases are needed.",
+        "analysis_skill": "terraform-change-analysis",
+        "authoring_skill": null,
+        "analysis_tools": [
+          "load_skill",
+          "read_module",
+          "submit_test_plan"
+        ],
+        "authoring_tools": [],
+        "usage": {
+          "promptTokenCount": 4296,
+          "candidatesTokenCount": 193,
+          "totalTokenCount": 4489
+        },
+        "status": "no_change_verified",
+        "baseline": null,
+        "existing": {
+          "passed": true,
+          "stage": "test",
+          "runs": [
+            {
+              "file": "tests/generated.tftest.hcl",
+              "name": "test_default_sku",
+              "status": "pass"
+            },
+            {
+              "file": "tests/generated.tftest.hcl",
+              "name": "test_sku_override",
+              "status": "pass"
+            },
+            {
+              "file": "tests/generated.tftest.hcl",
+              "name": "test_tags",
+              "status": "pass"
+            },
+            {
+              "file": "tests/generated.tftest.hcl",
+              "name": "test_output_id",
+              "status": "pass"
+            }
+          ],
+          "summary": {
+            "status": "pass",
+            "passed": 4,
+            "failed": 0,
+            "errored": 0,
+            "skipped": 0
+          },
+          "assertion_failure": false,
+          "diagnostics": []
+        },
+        "candidate": {
+          "image_id": "sha256:b675b4301eeb66ee15c0ff481f6774b9d3c86f81365ec85c0b25cde17d58862c",
+          "terraform": {
+            "passed": true,
+            "stage": "test",
+            "runs": [
+              {
+                "file": "tests/generated.tftest.hcl",
+                "name": "test_default_sku",
+                "status": "pass"
+              },
+              {
+                "file": "tests/generated.tftest.hcl",
+                "name": "test_sku_override",
+                "status": "pass"
+              },
+              {
+                "file": "tests/generated.tftest.hcl",
+                "name": "test_tags",
+                "status": "pass"
+              },
+              {
+                "file": "tests/generated.tftest.hcl",
+                "name": "test_output_id",
+                "status": "pass"
+              }
+            ],
+            "summary": {
+              "status": "pass",
+              "passed": 4,
+              "failed": 0,
+              "errored": 0,
+              "skipped": 0
+            },
+            "assertion_failure": false,
+            "diagnostics": []
+          },
+          "mutation": {
+            "executed": true,
+            "detected": true,
+            "attempts": [
+              {
+                "path": "modules/ai-search/main.tf",
+                "description": "Freeze sku wiring from var.sku to a known literal input.",
+                "detected": true,
+                "terraform": {
+                  "passed": false,
+                  "stage": "test",
+                  "runs": [
+                    {
+                      "file": "tests/generated.tftest.hcl",
+                      "name": "test_default_sku",
+                      "status": "pass"
+                    },
+                    {
+                      "file": "tests/generated.tftest.hcl",
+                      "name": "test_sku_override",
+                      "status": "fail"
+                    },
+                    {
+                      "file": "tests/generated.tftest.hcl",
+                      "name": "test_tags",
+                      "status": "pass"
+                    },
+                    {
+                      "file": "tests/generated.tftest.hcl",
+                      "name": "test_output_id",
+                      "status": "pass"
+                    }
+                  ],
+                  "summary": {
+                    "status": "fail",
+                    "passed": 3,
+                    "failed": 1,
+                    "errored": 0,
+                    "skipped": 0
+                  },
+                  "assertion_failure": true,
+                  "diagnostics": [
+                    {
+                      "summary": "Test assertion failed",
+                      "detail": "Expected SKU to be overridden to 'standard'."
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          "passed": true,
+          "suite_sha256": "2b3a189455a2a271f3870ac1f05cd0531f704707ae899af470d2b76b953a1c36"
+        },
+        "proposed_edits": {}
+      },
+      {
+        "module": "log-analytics-workspace",
+        "decision": "update_tests",
+        "summary": "The default value for retention_in_days was updated to 60, and the existing tests were updated to reflect this change. All requirements and outputs are fully covered by the updated test cases.",
+        "analysis_skill": "terraform-change-analysis",
+        "authoring_skill": "terraform-unit-testing",
+        "analysis_tools": [
+          "load_skill",
+          "read_module",
+          "submit_test_plan"
+        ],
+        "authoring_tools": [
+          "load_skill",
+          "propose_test_files",
+          "submit_proposal"
+        ],
+        "usage": {
+          "promptTokenCount": 21239,
+          "candidatesTokenCount": 1210,
+          "totalTokenCount": 22449
+        },
+        "status": "no_change_verified",
+        "baseline": {
+          "passed": true,
+          "stage": "test",
+          "runs": [
+            {
+              "file": "tests/generated.tftest.hcl",
+              "name": "defaults",
+              "status": "pass"
+            },
+            {
+              "file": "tests/generated.tftest.hcl",
+              "name": "overrides",
+              "status": "pass"
+            },
+            {
+              "file": "tests/generated.tftest.hcl",
+              "name": "output_id",
+              "status": "pass"
+            }
+          ],
+          "summary": {
+            "status": "pass",
+            "passed": 3,
+            "failed": 0,
+            "errored": 0,
+            "skipped": 0
+          },
+          "assertion_failure": false,
+          "diagnostics": []
+        },
+        "existing": {
+          "passed": true,
+          "stage": "test",
+          "runs": [
+            {
+              "file": "tests/generated.tftest.hcl",
+              "name": "defaults",
+              "status": "pass"
+            },
+            {
+              "file": "tests/generated.tftest.hcl",
+              "name": "overrides",
+              "status": "pass"
+            },
+            {
+              "file": "tests/generated.tftest.hcl",
+              "name": "output_id",
+              "status": "pass"
+            }
+          ],
+          "summary": {
+            "status": "pass",
+            "passed": 3,
+            "failed": 0,
+            "errored": 0,
+            "skipped": 0
+          },
+          "assertion_failure": false,
+          "diagnostics": []
+        },
+        "candidate": {
+          "image_id": "sha256:b675b4301eeb66ee15c0ff481f6774b9d3c86f81365ec85c0b25cde17d58862c",
+          "terraform": {
+            "passed": true,
+            "stage": "test",
+            "runs": [
+              {
+                "file": "tests/generated.tftest.hcl",
+                "name": "defaults",
+                "status": "pass"
+              },
+              {
+                "file": "tests/generated.tftest.hcl",
+                "name": "overrides",
+                "status": "pass"
+              },
+              {
+                "file": "tests/generated.tftest.hcl",
+                "name": "output_id",
+                "status": "pass"
+              }
+            ],
+            "summary": {
+              "status": "pass",
+              "passed": 3,
+              "failed": 0,
+              "errored": 0,
+              "skipped": 0
+            },
+            "assertion_failure": false,
+            "diagnostics": []
+          },
+          "mutation": {
+            "executed": true,
+            "detected": true,
+            "attempts": [
+              {
+                "path": "modules/log-analytics-workspace/main.tf",
+                "description": "Freeze retention_in_days wiring from var.retention_in_days to a known literal input.",
+                "detected": true,
+                "terraform": {
+                  "passed": false,
+                  "stage": "test",
+                  "runs": [
+                    {
+                      "file": "tests/generated.tftest.hcl",
+                      "name": "defaults",
+                      "status": "pass"
+                    },
+                    {
+                      "file": "tests/generated.tftest.hcl",
+                      "name": "overrides",
+                      "status": "fail"
+                    },
+                    {
+                      "file": "tests/generated.tftest.hcl",
+                      "name": "output_id",
+                      "status": "pass"
+                    }
+                  ],
+                  "summary": {
+                    "status": "fail",
+                    "passed": 2,
+                    "failed": 1,
+                    "errored": 0,
+                    "skipped": 0
+                  },
+                  "assertion_failure": true,
+                  "diagnostics": [
+                    {
+                      "summary": "Test assertion failed",
+                      "detail": "Retention must follow the caller override."
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          "passed": true,
+          "suite_sha256": "5a2832a813bd55eca5a3e3530e9a19b69a4feb78abdf97e82f855e62cd9bf137"
+        },
+        "proposed_edits": {}
+      }
+    ],
+    "patch_empty": true
+  },
+  "negative_replay": {
+    "scenario": "Reverify an earlier output-omitting proposal using the final output-coverage guard.",
+    "status": "needs_review",
+    "modules": [
+      {
+        "module": "ai-search",
+        "status": "needs_review",
+        "reason": "HCL policy rejected proposal: PLANNED_OUTPUT_ASSERTIONS_MISSING: id."
+      },
+      {
+        "module": "log-analytics-workspace",
+        "status": "verified",
+        "reason": ""
+      }
+    ],
+    "patch_contains_only_verified_workspace": true
+  },
+  "observed_development_failures": [
+    {
+      "issue": "A no_change plan listed proposed cases.",
+      "control": "One bounded structural correction; strict plan contract retained."
+    },
+    {
+      "issue": "An output assertion depended on an ID unknown during plan.",
+      "control": "Explicit plan-time computed mocks checked before execution."
+    },
+    {
+      "issue": "A structural repair removed planned output coverage.",
+      "detection": "Human review.",
+      "control": "Required output references checked during proposal and independent verification."
+    },
+    {
+      "issue": "An author proposal used an unsupported test block.",
+      "control": "Rejected within the fixed budget; skill gained a nesting example and error guidance."
+    }
+  ],
+  "limits": [
+    "LLM output is nondeterministic; synthetic commits and generated text vary on reruns.",
+    "Output reference checks do not prove every assertion is meaningful.",
+    "A detected source mutation is not a coverage percentage.",
+    "Mocked plans do not establish live Azure behavior or external script correctness."
+  ]
+}

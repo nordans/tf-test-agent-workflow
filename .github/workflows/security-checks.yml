@@ -25,7 +25,7 @@ jobs:
       - name: Validate workflows and embedded shell
         run: |
           actionlint -color
-          shellcheck .github/scripts/*.sh
+          shellcheck .github/scripts/*.sh runtime/*.sh
 
   secret-scan:
     name: Secret scan

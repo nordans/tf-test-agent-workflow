@@ -40,10 +40,10 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         run: uv run --locked --no-dev python -B -m test_agent.pr_workflow prepare
       - name: Install trusted secret scanner
-        if: steps.context.outputs.eligible == 'true'
+        if: steps.context.outputs.scan_required == 'true'
         run: bash .github/scripts/install-security-tool.sh betterleaks
       - name: Scan source before sending it to Gemini
-        if: steps.context.outputs.eligible == 'true'
+        if: steps.context.outputs.scan_required == 'true'
         run: >-
           betterleaks dir out/scan --redact=100 --no-banner --no-color
           --ignore-gitleaks-allow --timeout 120
@@ -58,7 +58,7 @@ jobs:
     needs: prepare
     if: needs.prepare.outputs.eligible == 'true'
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 20
     permissions:
       contents: read
       pull-requests: read
@@ -74,6 +74,8 @@ jobs:
         with:
           name: pr-context
           path: incoming
+      - name: Build approved runtime for provider schema checks
+        run: uv run --locked --no-dev python -B -m test_agent.build_runtime
       - name: Analyze changes and propose tests
         id: author
         env:
@@ -92,7 +94,7 @@ jobs:
     needs: [prepare, propose]
     if: needs.propose.outputs.verify == 'true'
     runs-on: ubuntu-24.04
-    timeout-minutes: 12
+    timeout-minutes: 20
     permissions:
       contents: read
     steps:

@@ -7,6 +7,7 @@ from pathlib import Path
 import yaml
 
 SKILL_NAME = "terraform-change-analysis"
+AUTHOR_SKILL = "terraform-unit-testing"
 MAX_FILE_BYTES = 16_384
 MAX_MODULE_BYTES = 98_304
 MAX_FILES = 32
@@ -72,10 +73,17 @@ class AnalysisContext:
         self._load_policy(trusted_root)
 
     @classmethod
-    def from_snapshot(cls, files, before_files, trusted_root, metadata):
+    def from_snapshot(cls, files, before_files, trusted_root, metadata, module=None):
         """Use immutable Git blobs; no PR checkout is imported or executed."""
         context = cls.__new__(cls)
-        context.module = "log-analytics-workspace"
+        names = {path.split("/")[1] for path in (*files, *before_files)}
+        if module is None:
+            if len(names) != 1:
+                raise AgentError("A planner context must contain exactly one module.")
+            module = next(iter(names))
+        if names - {module} or not re.fullmatch(r"[a-z][a-z0-9-]{0,63}", module):
+            raise AgentError("Planner sources do not match the selected module.")
+        context.module = module
         context.trusted_root = trusted_root.resolve()
         context.files, context.before_files = dict(files), dict(before_files)
         context.pr_metadata = metadata

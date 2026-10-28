@@ -38,6 +38,9 @@ COPY runtime/external-build/provider.tf /opt/external-check/main.tf
 COPY runtime/terraform.rc /opt/terraform.rc
 COPY runtime/verify.sh /opt/verify.sh
 COPY runtime/check-module.sh /opt/check-module.sh
+COPY runtime/verify-suite.sh /opt/verify-suite.sh
+COPY runtime/provider-schemas.sh /opt/provider-schemas.sh
+COPY runtime/schema.tf /opt/schema.tf
 COPY runtime/external-smoke.tf /opt/external-smoke/main.tf
 COPY runtime/external-smoke.tftest.hcl /opt/external-smoke/tests/main.tftest.hcl
 ENV TF_CLI_CONFIG_FILE=/opt/terraform.rc TF_IN_AUTOMATION=1 TF_INPUT=0 CHECKPOINT_DISABLE=1

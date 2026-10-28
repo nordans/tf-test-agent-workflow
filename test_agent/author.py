@@ -5,11 +5,16 @@ import json
 
 import yaml
 
-from test_agent.context import AgentError, AnalysisContext, read_text, sha256_text
+from test_agent.context import (
+    AUTHOR_SKILL,
+    AgentError,
+    AnalysisContext,
+    read_text,
+    sha256_text,
+)
 from test_agent.hcl_policy import MODULE, TEST_PATH, validate_proposal, validate_sources
 from test_agent.planner import declaration, run_planner
 
-AUTHOR_SKILL = "terraform-unit-testing"
 MAX_AUTHOR_ROUNDS = 6
 
 
