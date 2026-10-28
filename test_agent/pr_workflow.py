@@ -16,7 +16,14 @@ from test_agent.github import MARKER, GitHub
 from test_agent.hcl_policy import validate_proposal, validate_update
 from test_agent.pr_author import draft_tests
 from test_agent.pr_context import TARGET, GitRepository, PRBundle, PRIdentity
-from test_agent.pr_results import Draft, Verification, digest, read_json, write_json
+from test_agent.pr_results import (
+    Draft,
+    Verification,
+    digest,
+    read_json,
+    same_test_content,
+    write_json,
+)
 from test_agent.sandbox import DockerRunner, docker_environment
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -112,7 +119,9 @@ def verify_tests(bundle, draft, runner):
             )
         else:
             report.status = (
-                "verified" if draft.status == "proposed" else "no_change_verified"
+                "no_change_verified"
+                if same_test_content(candidate, existing)
+                else "verified"
             )
     except AgentError as error:
         report.status, report.reason = "failed", str(error)
@@ -160,7 +169,7 @@ def render_comment(bundle, draft, report, run_id=None):
         lines.append("Analysis skill: terraform-change-analysis.")
         if "load_skill" in draft.tool_calls:
             lines.append("Authoring skill: terraform-unit-testing.")
-        lines.extend([f"Decision: **{plan.decision}**", literal(plan.summary)])
+        lines.extend([f"Planner decision: **{plan.decision}**", literal(plan.summary)])
         for finding in plan.findings:
             locations = ", ".join(
                 f"{e.revision}:{e.file}:{e.line}" for e in finding.evidence
@@ -182,6 +191,10 @@ def render_comment(bundle, draft, report, run_id=None):
         )
         lines.append(
             f"Retention mutation detected: {report.candidate['mutation'].get('detected', False)}."
+        )
+    if report.status == "no_change_verified":
+        lines.append(
+            "No test changes are needed. Existing PR tests passed verification and the retention negative control."
         )
     if proposal_patch(bundle, report):
         lines.append(

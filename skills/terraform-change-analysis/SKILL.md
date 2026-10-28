@@ -11,6 +11,14 @@ when citing removed code. Focus the plan on changed behavior and relevant existi
 assertions. A changed literal default can require updating an old expectation.
 Flag weakened security behavior rather than normalizing a weaker expectation.
 
+Decide whether the current tests in files (the after revision) need further edits.
+The PR author
+may already have updated the tests alongside the source change. Do not list
+existing, sufficient assertions as proposed test cases or request the same update
+again. If the current tests cover the changed behavior and no gaps remain, submit
+no_change with an empty test_cases list and explain the existing coverage in the
+summary. Inventorying coverage does not itself justify add_tests or update_tests.
+
 Read the selected module's source and existing `.tftest.hcl` files with `read_module`.
 Inventory inputs, defaults, validations, resource arguments, conditional or repeated
 resources, and outputs. Derive existing coverage from assertions, not filenames or

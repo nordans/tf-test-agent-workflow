@@ -98,7 +98,12 @@ to an old condition is a literal default-retention equality, from the before
 source's default to the after source's default, with no retention input override.
 Other behavior changes need human review; this intentionally limits autonomy.
 A no_change decision still requires execution of existing tests and the negative
-control. Passing verification produces a patch, never an automatic commit.
+control. The analysis skill plans only missing edits against the current PR tests;
+it must not turn an inventory of existing coverage into proposed test cases.
+If the model nevertheless submits the existing file again, the author and verifier
+independently recognise that as no change (ignoring only CRLF/LF differences).
+The report preserves the raw planner decision separately from the verified result.
+Only a real, verified change produces a patch, never an automatic commit.
 
 Fork, bot and draft PRs do not invoke Gemini. Docs-only changes do not spend model
 quota. Unsupported modules, stack changes, controller/policy changes, additional
@@ -117,6 +122,15 @@ completed all four workers and published its comment successfully. Its patch
 updated only the default-retention equality and its message. Controller unit tests
 use their own module fixture so changes to real Terraform defaults do not alter
 the synthetic before/after scenario.
+
+After the patch was applied, the GitHub run
+[40775288726](https://github.com/nordans/tf-test-agent-workflow/actions/runs/40775288726)
+passed all stages but the model reported update_tests while proposing an identical
+file. This prompted the deterministic no-change guard and skill clarification.
+A real local Gemini run against the same PR revisions with these changes chose
+no_change, skipped authoring, passed all three existing test runs and detected the
+retention mutation. GitHub publication with the updated trusted code still needs
+verification after this controller change is merged.
 
 The recorded local retention example under docs/examples/pr-retention changed a
 temporary Git repository's default from 30 to 60. Real Gemini called both skills
