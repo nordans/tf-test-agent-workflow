@@ -13,7 +13,7 @@ from pathlib import Path
 from test_agent.context import AgentError, sha256_text
 from test_agent.hcl_policy import MODULE, Proposal, validate_proposal, validate_sources
 
-IMAGE = "tf-test-agent-runtime:tf1.17.1-azurerm4.81.0"
+IMAGE = "tf-test-agent-runtime:tf1.17.1-azurerm5.11.0"
 MAX_LOG_BYTES = 1_048_576
 WALL_SECONDS = 120
 
