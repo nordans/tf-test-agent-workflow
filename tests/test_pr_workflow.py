@@ -322,6 +322,50 @@ def test_proposed_requirement_does_not_auto_rewrite_infrastructure(repository):
     client.generate.assert_not_called()
 
 
+def test_identical_model_proposal_is_no_change_but_keeps_planner_evidence(repository):
+    bundle = changed_bundle(repository, applied=True)
+    client = FakeClient(
+        [
+            tool_calls(("load_skill", {"name": "terraform-unit-testing"})),
+            tool_calls(("propose_test_file", {"content": UPDATED})),
+            tool_calls(("submit_proposal", {})),
+        ]
+    )
+    with patch("test_agent.pr_author.run_planner", return_value=analysis()):
+        result = draft_tests(bundle, ROOT, client)
+    assert result.status == "no_change"
+    assert result.hcl is None
+    assert result.analysis.plan.decision == "update_tests"
+    assert "identical" in result.reason
+
+
+def test_planner_no_change_skips_authoring(repository):
+    bundle = changed_bundle(repository, applied=True)
+    plan = analysis()
+    plan["plan"].update(decision="no_change", test_cases=[])
+    client = Mock(usage={})
+    with patch("test_agent.pr_author.run_planner", return_value=plan):
+        result = draft_tests(bundle, ROOT, client)
+    assert result.status == "no_change"
+    client.generate.assert_not_called()
+
+
+def test_verifier_independently_recognises_an_identical_proposal(repository):
+    bundle = changed_bundle(repository, applied=True)
+    item = draft(bundle)
+    item.analysis = Analysis.model_validate(analysis())
+    worker = runner()
+    worker.execute.side_effect = [(execution(), HCL), (execution(), UPDATED)]
+    report = verify_tests(bundle, item, worker)
+    assert report.status == "no_change_verified"
+    worker.verify.assert_called_once()
+    assert not proposal_patch(bundle, report)
+    comment = render_comment(bundle, item, report)
+    assert "Planner decision: **update_tests**" in comment
+    assert "No test changes are needed." in comment
+    assert "A verified test patch is available" not in comment
+
+
 def test_baseline_existing_and_candidate_are_distinct_and_patch_updates_file(
     repository,
 ):

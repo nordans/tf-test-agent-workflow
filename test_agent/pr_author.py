@@ -7,7 +7,7 @@ from test_agent.context import MAX_FILE_BYTES, AgentError, read_text, sha256_tex
 from test_agent.hcl_policy import validate_update
 from test_agent.planner import declaration, run_planner
 from test_agent.pr_context import TARGET
-from test_agent.pr_results import Analysis, Draft, digest
+from test_agent.pr_results import Analysis, Draft, digest, same_test_content
 
 
 def draft_tests(bundle, trusted_root, client):
@@ -131,7 +131,14 @@ def draft_tests(bundle, trusted_root, client):
                 )
             result.status = "proposed" if result.hcl is not None else "needs_review"
             if result.hcl is not None:
-                result.reason = ""
+                if same_test_content(result.hcl, bundle.after_files.get(TARGET)):
+                    result.status, result.hcl, result.reason = (
+                        "no_change",
+                        None,
+                        "The proposed test file is identical to the existing PR test file.",
+                    )
+                else:
+                    result.reason = ""
             result.usage = dict(client.usage)
             return result
         response_part = {"name": name, "response": tool_result}
