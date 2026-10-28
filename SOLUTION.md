@@ -13,7 +13,9 @@ Azure credentials. A separate PR agent workflow selects changed modules, analyze
 immutable before/after snapshots, proposes tests, verifies them and publishes a
 report to the originating PR. The workflow must be merged into main before its
 first automatic run. The final demonstration PR will follow GitHub integration
-verification and broader module support.
+verification and broader module support. The first GitHub integration run is
+[PR #10](https://github.com/nordans/tf-test-agent-workflow/pull/10), where the bot
+published its verified proposal in the originating PR without committing it.
 
 ## Running it
 
@@ -110,6 +112,11 @@ stale/closed PRs are not updated. An API write can still race a subsequent commi
 so every comment identifies the exact analyzed revisions. Artifacts are retained
 for seven days. GitHub permission/publication behavior must be tested after merge;
 local runs and mocked GitHub tests cannot establish that integration works.
+The first real [workflow run](https://github.com/nordans/tf-test-agent-workflow/actions/runs/40773642919)
+completed all four workers and published its comment successfully. Its patch
+updated only the default-retention equality and its message. Controller unit tests
+use their own module fixture so changes to real Terraform defaults do not alter
+the synthetic before/after scenario.
 
 The recorded local retention example under docs/examples/pr-retention changed a
 temporary Git repository's default from 30 to 60. Real Gemini called both skills

@@ -8,7 +8,7 @@ from unittest.mock import Mock, patch
 import pytest
 from test_module_planner import FakeClient, tool_calls
 
-from test_agent.context import AgentError, AnalysisContext, sha256_text
+from test_agent.context import AgentError, sha256_text
 from test_agent.github import MARKER, GitHub
 from test_agent.hcl_policy import validate_update
 from test_agent.pr_author import draft_tests
@@ -31,7 +31,15 @@ from test_agent.pr_workflow import (
 ROOT = Path(__file__).resolve().parents[1]
 MODULE = "log-analytics-workspace"
 VARIABLES = f"modules/{MODULE}/variables.tf"
-ORIGINAL = AnalysisContext(ROOT, ROOT, MODULE).files
+FIXTURE = ROOT / "tests/fixtures/log_analytics_module"
+# Controller tests own their baseline; infrastructure PRs may change real defaults.
+ORIGINAL = {
+    f"modules/{MODULE}/{path.name}": path.read_text(encoding="utf-8")
+    for path in FIXTURE.glob("*.tf")
+}
+ORIGINAL[TARGET] = (ROOT / "tests/fixtures/log_analytics_valid.tftest.hcl").read_text(
+    encoding="utf-8"
+)
 HCL = ORIGINAL[TARGET]
 UPDATED = HCL.replace("retention_in_days == 30", "retention_in_days == 60")
 
