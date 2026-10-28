@@ -19,7 +19,9 @@ class GeminiSmokeTest(unittest.TestCase):
         response.read.side_effect = read_error
         stdout, stderr = io.StringIO(), io.StringIO()
         with (
-            patch.dict(os.environ, {"GEMINI_API_KEY": "offline-test-secret"}, clear=True),
+            patch.dict(
+                os.environ, {"GEMINI_API_KEY": "offline-test-secret"}, clear=True
+            ),
             patch.object(smoke.http.client, "HTTPSConnection", return_value=connection),
             contextlib.redirect_stdout(stdout),
             contextlib.redirect_stderr(stderr),
@@ -34,7 +36,9 @@ class GeminiSmokeTest(unittest.TestCase):
         return stderr.getvalue()
 
     def test_service_unavailable_reports_status(self):
-        log = self.run_failure(json.dumps({"error": {"status": "UNAVAILABLE"}}).encode())
+        log = self.run_failure(
+            json.dumps({"error": {"status": "UNAVAILABLE"}}).encode()
+        )
         self.assertIn("HTTP 503", log)
         self.assertIn("Gemini status: UNAVAILABLE", log)
         self.assertIn("ErrorInfo reasons: not provided", log)
@@ -43,11 +47,13 @@ class GeminiSmokeTest(unittest.TestCase):
         error = {
             "status": "INVALID_ARGUMENT",
             "message": "offline-test-secret ::error::unsafe-message",
-            "details": [{
-                "@type": "type.googleapis.com/google.rpc.ErrorInfo",
-                "reason": "API_KEY_INVALID",
-                "metadata": {"consumer": "private-project-identifier"},
-            }],
+            "details": [
+                {
+                    "@type": "type.googleapis.com/google.rpc.ErrorInfo",
+                    "reason": "API_KEY_INVALID",
+                    "metadata": {"consumer": "private-project-identifier"},
+                }
+            ],
         }
         log = self.run_failure(json.dumps({"error": error}).encode(), status=400)
         self.assertIn("Gemini status: INVALID_ARGUMENT", log)
@@ -59,10 +65,14 @@ class GeminiSmokeTest(unittest.TestCase):
         error = {
             "status": "offline-test-secret\n::error::injected-status",
             "details": [
-                {"@type": "type.googleapis.com/google.rpc.ErrorInfo",
-                 "reason": "offline-test-secret\n::warning::injected-reason"},
-                {"@type": "type.googleapis.com/google.rpc.LocalizedMessage",
-                 "message": "injected-localized-message"},
+                {
+                    "@type": "type.googleapis.com/google.rpc.ErrorInfo",
+                    "reason": "offline-test-secret\n::warning::injected-reason",
+                },
+                {
+                    "@type": "type.googleapis.com/google.rpc.LocalizedMessage",
+                    "message": "injected-localized-message",
+                },
             ],
         }
         log = self.run_failure(json.dumps({"error": error}).encode())
@@ -90,13 +100,19 @@ class GeminiSmokeTest(unittest.TestCase):
         cases = [
             {"status": [], "details": "offline-test-secret"},
             {"status": {}, "details": [None, [], "offline-test-secret"]},
-            {"status": "UNAVAILABLE", "details": [
-                {"@type": "type.googleapis.com/google.rpc.ErrorInfo", "reason": []},
-            ]},
+            {
+                "status": "UNAVAILABLE",
+                "details": [
+                    {"@type": "type.googleapis.com/google.rpc.ErrorInfo", "reason": []},
+                ],
+            },
         ]
         for error in cases:
             with self.subTest(error=error):
-                self.assertIn("Gemini status:", self.run_failure(json.dumps({"error": error}).encode()))
+                self.assertIn(
+                    "Gemini status:",
+                    self.run_failure(json.dumps({"error": error}).encode()),
+                )
 
     def test_body_read_failure_does_not_hide_http_status(self):
         log = self.run_failure(b"", read_error=TimeoutError("offline-test-secret"))
@@ -107,13 +123,19 @@ class GeminiSmokeTest(unittest.TestCase):
         connection = MagicMock()
         response = connection.getresponse.return_value
         response.status = 200
-        response.read.return_value = json.dumps({
-            "candidates": [{"finishReason": "STOP", "content": {"parts": [{"text": "OK"}]}}],
-            "usageMetadata": {"totalTokenCount": 8},
-        }).encode()
+        response.read.return_value = json.dumps(
+            {
+                "candidates": [
+                    {"finishReason": "STOP", "content": {"parts": [{"text": "OK"}]}}
+                ],
+                "usageMetadata": {"totalTokenCount": 8},
+            }
+        ).encode()
         output = io.StringIO()
         with (
-            patch.dict(os.environ, {"GEMINI_API_KEY": "offline-test-secret"}, clear=True),
+            patch.dict(
+                os.environ, {"GEMINI_API_KEY": "offline-test-secret"}, clear=True
+            ),
             patch.object(smoke.http.client, "HTTPSConnection", return_value=connection),
             contextlib.redirect_stdout(output),
         ):

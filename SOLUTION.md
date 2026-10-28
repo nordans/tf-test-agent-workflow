@@ -15,25 +15,30 @@ The final example PR demonstrating the complete workflow will come later.
 
 ## Running it
 
-Use Python 3.12, Docker with a Linux amd64 engine, and a trusted checkout. From an
-activated virtual environment at the repository root:
+Use Python 3.12, uv 0.13.6, Docker with a Linux amd64 engine, and a trusted checkout.
+Install uv following its [installation instructions](https://docs.astral.sh/uv/getting-started/installation/).
+Run these commands from the repository root; uv manages the virtual environment:
 
 ```sh
-python -m pip install -r requirements.txt
-python -B -m unittest discover -s tests -v
-python -B -m test_agent.build_runtime
-python -B -m test_agent.verify
+uv sync --locked
+uv run --locked ruff check .
+uv run --locked ruff format --check .
+uv run --locked python -B -m pytest
+uv run --locked python -B -m test_agent.build_runtime
+uv run --locked python -B -m test_agent.verify
 ```
 
 Building the runtime requires network access to obtain Terraform and the provider.
 Verification itself has no network access. It runs the checked-in proposal and
-does not use any model API. The `Terraform mocked tests` PR workflow runs these
-same commands and uploads `verification.json`, including failure results.
+does not use any model API. PR checks run Ruff and pytest in `Python checks`.
+The separate `Terraform mocked tests` workflow builds the runtime, runs
+verification with runtime dependencies only, and uploads `verification.json`,
+including failure results.
 
 For live analysis, set `GEMINI_API_KEY` securely in the process environment:
 
 ```sh
-python -B -m test_agent log-analytics-workspace
+uv run --locked python -B -m test_agent log-analytics-workspace
 ```
 
 Do not put a literal key in shell history, committed files or reports. Live agent
@@ -69,8 +74,24 @@ previous artifacts: this stage intentionally refuses to update an existing file.
 
 Python and a small Gemini REST adapter keep the tool loop inspectable, at the
 cost of maintaining protocol handling. Pydantic validates plans, PyYAML reads
-skill metadata, and python-hcl2 parses HCL. Resolved dependencies are pinned;
-Python package hashes and automated dependency updates are not configured yet.
+skill metadata, and python-hcl2 parses HCL. Direct dependencies are declared in
+`pyproject.toml`; `uv.lock` records their resolved dependencies and distribution
+hashes. It replaces the previous hand-maintained `requirements.txt`. uv checks
+downloaded packages against the recorded hashes; this verifies integrity, not
+whether a package is trustworthy or free of vulnerabilities. `--locked` refuses
+to change an absent or outdated lock file. Dependency updates are explicit; an
+automated update process and vulnerability scanning are not configured yet.
+
+The supported Python minor version is 3.12, recorded in `.python-version` and
+restricted in project metadata; other versions are not tested. uv is pinned by
+`tool.uv.required-version`, which the SHA-pinned setup action also reads. The
+project runs from the checkout without a packaging/build backend. The `dev` group
+contains Ruff and pytest. The Python PR job runs lint, format checks and pytest;
+existing `unittest.TestCase` tests run unchanged under pytest. Ruff enables a small
+explicit rule set for errors, imports, common pitfalls and Python 3.12 syntax.
+The Terraform job uses `--no-dev` for both sync and run, so it installs only runtime
+dependencies. The manual Gemini smoke test uses the standard library and needs
+neither project dependencies nor uv.
 
 ## Execution and trust boundaries
 
