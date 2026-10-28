@@ -30,7 +30,7 @@ uv run --locked python -B -m test_agent.verify
 
 Building the runtime requires network access to obtain Terraform and the provider.
 Verification itself has no network access. It runs the checked-in proposal and
-does not use any model API. PR checks run Ruff and pytest in `Python checks`.
+does not use any model API. PR checks run Ruff and pytest in `Code quality CI`.
 The separate `Terraform mocked tests` workflow builds the runtime, runs
 verification with runtime dependencies only, and uploads `verification.json`,
 including failure results.
@@ -80,7 +80,7 @@ hashes. It replaces the previous hand-maintained `requirements.txt`. uv checks
 downloaded packages against the recorded hashes; this verifies integrity, not
 whether a package is trustworthy or free of vulnerabilities. `--locked` refuses
 to change an absent or outdated lock file. Dependency updates are explicit; an
-automated update process and vulnerability scanning are not configured yet.
+automated dependency update process is not configured yet.
 
 The supported Python minor version is 3.12, recorded in `.python-version` and
 restricted in project metadata; other versions are not tested. uv is pinned by
@@ -92,6 +92,57 @@ explicit rule set for errors, imports, common pitfalls and Python 3.12 syntax.
 The Terraform job uses `--no-dev` for both sync and run, so it installs only runtime
 dependencies. The manual Gemini smoke test uses the standard library and needs
 neither project dependencies nor uv.
+
+## CI security checks
+
+All automatic checks run on opened, updated or reopened PRs targeting `main`,
+without path filters. No Gemini or Azure credentials are supplied. The checks are:
+
+| Check | Gate |
+| --- | --- |
+| Code quality CI | Ruff lint/format and pytest must pass. |
+| Workflow validation | Actionlint and ShellCheck must accept the workflows/installer. |
+| Secret scan | Betterleaks 1.9.0 scans all fetched Git history; findings fail the job. |
+| Dependency audit | pip-audit 2.10.1 fails on known Python vulnerabilities or incomplete auditing. |
+| Terraform CI | Mock tests/mutation must pass and Trivy must find no HIGH/CRITICAL image vulnerabilities. |
+
+The secret scan checks committed content, including the PR commits, with full
+history, 100% redaction and inline allow comments disabled. It never enables live
+credential validation and does not publish a secret report as an artifact. It
+cannot prevent a secret from first being pushed; local scanning before a commit
+is still useful. It does not inspect arbitrary untracked files on a developer's
+machine.
+
+The separate `audit` dependency group pins pip-audit and its dependencies in
+`uv.lock`. CI exports all dependency groups with hashes and audits their pinned
+versions without invoking pip resolution or installation. Platform markers apply
+to the Linux CI environment. PyPI supplies advisory data; network/scanner errors
+fail the check. JSON results are retained for seven days. No automatic dependency
+fixes or vulnerability suppressions are configured.
+
+Trivy 0.76.1 scans the built runner image, including OS packages and embedded Go
+binaries, and saves the full JSON report. A separate `trivy convert` gate reads
+that report and fails on HIGH or CRITICAL findings, including unfixed issues.
+There are no ignore lists. Scanner/database errors also fail the job. Reports are
+uploaded with test verification for seven days. The database is refreshed during
+scanning, so identical code can fail later when new advisories appear. Scanning
+requires network access; Terraform execution remains networkless.
+
+`.github/scripts/install-security-tool.sh` downloads fixed Linux amd64 releases
+of Actionlint, Betterleaks and Trivy, verifies committed SHA-256 archive hashes,
+then extracts only the selected binary. This avoids running a downloaded install
+script. Checksums pin reviewed downloads; they do not prove software is harmless.
+GitHub actions are also pinned by commit SHA. Security checks can be dispatched
+manually; image scanning uses the Terraform workflow's manual dispatch.
+
+The initial scan found HIGH/CRITICAL advisories in AzureRM 4.81.0's embedded Go
+dependencies. That is the last 4.x release available at the time of review.
+Consequently `Terraform CI` is intentionally red until a separate reviewed
+provider migration fixes the findings. Existing reports are not a baseline that
+silences future scans. Required-check enforcement will be configured after the
+workflow changes and provider remediation have been merged; it is not enabled by
+these workflow files themselves. The manual Gemini connectivity check must not
+be made required because it does not run on PRs.
 
 ## Execution and trust boundaries
 

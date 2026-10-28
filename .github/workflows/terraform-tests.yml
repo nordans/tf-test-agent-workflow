@@ -10,6 +10,7 @@ permissions:
 
 jobs:
   log-analytics-workspace:
+    name: Terraform CI
     runs-on: ubuntu-24.04
     timeout-minutes: 12
     steps:
@@ -38,11 +39,25 @@ jobs:
       - name: Verify reviewed tests and retention mutation
         run: uv run --locked --no-dev python -B -m test_agent.verify > verification.json
 
+      - name: Install checksum-pinned Trivy
+        run: bash .github/scripts/install-security-tool.sh trivy
+
+      - name: Scan the built runtime image
+        run: >-
+          trivy image --image-src docker --scanners vuln --timeout 5m
+          --format json --output image-scan.json
+          tf-test-agent-runtime:tf1.17.1-azurerm4.81.0
+
+      - name: Block high and critical image vulnerabilities
+        run: trivy convert --severity HIGH,CRITICAL --exit-code 1 --format table image-scan.json
+
       - name: Upload verification results
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: log-analytics-workspace-verification
-          path: verification.json
+          path: |
+            verification.json
+            image-scan.json
           if-no-files-found: warn
           retention-days: 7

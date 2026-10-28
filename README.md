@@ -22,6 +22,10 @@ These same checks run on pull requests. To apply formatting locally, run
 together with the generated `uv.lock`; use `uv add` or `uv add --dev` to add a
 dependency. See [SOLUTION.md](SOLUTION.md) for agent and Docker commands.
 
+PRs also run workflow validation, secret and dependency scans, and a vulnerability
+scan of the Terraform runner image. See [CI security checks](SOLUTION.md#ci-security-checks)
+for the exact gates, reports and current provider findings.
+
 ## Layout
 
 ```text
