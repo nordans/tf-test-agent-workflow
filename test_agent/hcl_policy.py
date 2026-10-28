@@ -244,3 +244,54 @@ def validate_proposal(text: str) -> Proposal:
             )
         names.append(name)
     return Proposal(text, tuple(names), tuple(conditions))
+
+
+def validate_update(previous: str | None, text: str, before, after) -> Proposal:
+    """Preserve old checks; permit only a source-backed default-retention edit."""
+    proposal = validate_proposal(text)
+    if previous is None:
+        return proposal
+    old = validate_proposal(previous)
+    required = set(old.conditions)
+    variables_path = f"modules/{MODULE}/variables.tf"
+
+    def retention(files):
+        data = parse_hcl(
+            files.get(variables_path, ""),
+            allowed_functions=frozenset({"map", "length"}),
+        )
+        for item in data.get("variable", []):
+            if "retention_in_days" in item:
+                value = item["retention_in_days"].get("default")
+                return value if type(value) is int else None
+        return None
+
+    old_default, new_default = retention(before), retention(after)
+    if (
+        old_default is not None
+        and new_default is not None
+        and old_default != new_default
+    ):
+        for key in old.conditions:
+            condition = json.loads(key)
+            global_inputs = condition["global_variables"][0]
+            run_inputs = condition["run_variables"]
+            overridden = "retention_in_days" in global_inputs or any(
+                "retention_in_days" in item for item in run_inputs
+            )
+            expected = (
+                "$" + "{" + f"{RESOURCE}.this.retention_in_days == {old_default}" + "}"
+            )
+            if not overridden and condition["condition"] == expected:
+                condition["condition"] = (
+                    "$"
+                    + "{"
+                    + f"{RESOURCE}.this.retention_in_days == {new_default}"
+                    + "}"
+                )
+                required.remove(key)
+                required.add(json.dumps(condition, sort_keys=True))
+    require(
+        required <= set(proposal.conditions), "EXISTING_ASSERTIONS_MUST_BE_PRESERVED"
+    )
+    return proposal

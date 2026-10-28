@@ -1,0 +1,116 @@
+{
+  "identity": {
+    "repository": "local/example",
+    "number": 1,
+    "base_sha": "9fe9eb31f74989fbfadca0a0182cd2c38bed768d",
+    "head_sha": "51cda26cde6f705299dff0a19c2001999e5dbf88",
+    "origin": "local"
+  },
+  "bundle_sha256": "f3f7c02d60064e61964b2e2b82b73746bf90e79928e86df8084d7f21d73f4655",
+  "status": "proposed",
+  "analysis": {
+    "mode": "analysis_only",
+    "module": "log-analytics-workspace",
+    "model": "gemini-3.5-flash-lite",
+    "tests_executed": false,
+    "tool_calls": [
+      "load_skill",
+      "read_module",
+      "submit_test_plan"
+    ],
+    "existing_test_files": [
+      "modules/log-analytics-workspace/tests/generated.tftest.hcl"
+    ],
+    "provenance": {
+      "agent_sha256": "5e9d6287926727b77397749bb0034cc8fc678498bd5e26c17841b35cdd834e92",
+      "skill": {
+        "name": "terraform-change-analysis",
+        "sha256": "60521c05c93375415134d1f561809371e27b18d5cafee880af5136cc694d24d6"
+      },
+      "files": [
+        {
+          "path": "modules/log-analytics-workspace/main.tf",
+          "sha256": "89742ebd333714242c4eb2b3a1912fb1dd29e6df5c617cfecb33e6eddba952d0"
+        },
+        {
+          "path": "modules/log-analytics-workspace/outputs.tf",
+          "sha256": "3dfb7b63242ec018b1281a53cc730289b3ceaa6c0ebf535f3383a5dbe012e0cd"
+        },
+        {
+          "path": "modules/log-analytics-workspace/tests/generated.tftest.hcl",
+          "sha256": "625e3c3b00c1b821b2d79d53e13c87045adb030950d612e130756ac56625a905"
+        },
+        {
+          "path": "modules/log-analytics-workspace/variables.tf",
+          "sha256": "3c0f05a3aab0c455cbfd205c9329d29bb5e85b2da7e068bf7121fbdc87dc4b39"
+        },
+        {
+          "path": "modules/log-analytics-workspace/versions.tf",
+          "sha256": "7916305a9ec88ef83e17d058f0c130829d7bf300f267f9503e02879d593d4134"
+        }
+      ]
+    },
+    "usage": {
+      "promptTokenCount": 4959,
+      "candidatesTokenCount": 308,
+      "totalTokenCount": 5267
+    },
+    "plan": {
+      "decision": "update_tests",
+      "summary": "Update existing native tests to reflect the changed default value of retention_in_days from 30 to 60.",
+      "test_cases": [
+        {
+          "name": "default_configuration_retention",
+          "category": "default",
+          "basis": "implemented_behavior",
+          "purpose": "Ensure default retention_in_days matches the updated variable default of 60.",
+          "expected": "retention_in_days defaults to 60",
+          "evidence": [
+            {
+              "revision": "after",
+              "file": "modules/log-analytics-workspace/variables.tf",
+              "line": 19
+            }
+          ]
+        }
+      ],
+      "findings": [
+        {
+          "severity": "warning",
+          "description": "The default value for retention_in_days was changed from 30 to 60 in variables.tf, but existing tests still assert the old default of 30.",
+          "evidence": [
+            {
+              "revision": "after",
+              "file": "modules/log-analytics-workspace/variables.tf",
+              "line": 19
+            },
+            {
+              "revision": "after",
+              "file": "modules/log-analytics-workspace/tests/generated.tftest.hcl",
+              "line": 25
+            }
+          ]
+        }
+      ],
+      "limitations": [
+        "Tests use provider mocking and do not validate live Azure interactions or service-side validation constraints."
+      ]
+    }
+  },
+  "hcl": "mock_provider \"azurerm\" {\n  override_during = plan\n  mock_resource \"azurerm_log_analytics_workspace\" {\n    defaults = {\n      id = \"/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-test/providers/Microsoft.OperationalInsights/workspaces/log-test\"\n    }\n  }\n}\n\nvariables {\n  name                = \"law-test\"\n  resource_group_name = \"rg-test\"\n  location            = \"eastus\"\n}\n\nrun \"default_configuration\" {\n  command = plan\n\n  assert {\n    condition     = azurerm_log_analytics_workspace.this.sku == \"PerGB2018\"\n    error_message = \"Expected SKU to be PerGB2018 by default.\"\n  }\n\n  assert {\n    condition     = azurerm_log_analytics_workspace.this.retention_in_days == 60\n    error_message = \"Expected default retention_in_days to be 60.\"\n  }\n\n  assert {\n    condition     = length(azurerm_log_analytics_workspace.this.tags) == 0\n    error_message = \"Expected tags to be empty by default.\"\n  }\n}\n\nrun \"custom_override\" {\n  command = plan\n\n  variables {\n    retention_in_days = 90\n    tags = {\n      Environment = \"test\"\n    }\n  }\n\n  assert {\n    condition     = azurerm_log_analytics_workspace.this.retention_in_days == 90\n    error_message = \"Expected custom retention_in_days to be 90.\"\n  }\n\n  assert {\n    condition     = azurerm_log_analytics_workspace.this.tags[\"Environment\"] == \"test\"\n    error_message = \"Expected tags to include Environment = test.\"\n  }\n}\n\nrun \"outputs\" {\n  command = plan\n\n  assert {\n    condition     = output.id == \"/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-test/providers/Microsoft.OperationalInsights/workspaces/log-test\"\n    error_message = \"Output id did not match expected mock workspace ID.\"\n  }\n}\n",
+  "tool_calls": [
+    "load_skill",
+    "propose_test_file",
+    "submit_proposal"
+  ],
+  "usage": {
+    "promptTokenCount": 18116,
+    "candidatesTokenCount": 931,
+    "totalTokenCount": 19047
+  },
+  "policy": {
+    "instructions_sha256": "5bf52d2e299174c5958c9a1c6139ebe634f7ee9f06aa85f1b2a507803ccb2922",
+    "skill_sha256": "3f63ea6d2749842e035118db554f92d01af829948f3152bc4d30e0e8425052bc"
+  },
+  "reason": ""
+}

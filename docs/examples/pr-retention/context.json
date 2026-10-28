@@ -1,0 +1,35 @@
+{
+  "identity": {
+    "repository": "local/example",
+    "number": 1,
+    "base_sha": "9fe9eb31f74989fbfadca0a0182cd2c38bed768d",
+    "head_sha": "51cda26cde6f705299dff0a19c2001999e5dbf88",
+    "origin": "local"
+  },
+  "merge_base": "9fe9eb31f74989fbfadca0a0182cd2c38bed768d",
+  "changes": [
+    {
+      "status": "M",
+      "path": "modules/log-analytics-workspace/variables.tf",
+      "previous_path": null
+    }
+  ],
+  "selected_modules": [
+    "log-analytics-workspace"
+  ],
+  "reasons": [],
+  "before_files": {
+    "modules/log-analytics-workspace/main.tf": "resource \"azurerm_log_analytics_workspace\" \"this\" {\n  name                = var.name\n  resource_group_name = var.resource_group_name\n  location            = var.location\n  sku                 = \"PerGB2018\"\n  retention_in_days   = var.retention_in_days\n  tags                = var.tags\n}\n",
+    "modules/log-analytics-workspace/outputs.tf": "output \"id\" {\n  description = \"ID of the workspace.\"\n  value       = azurerm_log_analytics_workspace.this.id\n}\n",
+    "modules/log-analytics-workspace/tests/generated.tftest.hcl": "mock_provider \"azurerm\" {\n  override_during = plan\n  mock_resource \"azurerm_log_analytics_workspace\" {\n    defaults = {\n      id = \"/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-test/providers/Microsoft.OperationalInsights/workspaces/log-test\"\n    }\n  }\n}\n\nvariables {\n  name                = \"law-test\"\n  resource_group_name = \"rg-test\"\n  location            = \"eastus\"\n}\n\nrun \"default_configuration\" {\n  command = plan\n\n  assert {\n    condition     = azurerm_log_analytics_workspace.this.sku == \"PerGB2018\"\n    error_message = \"Expected SKU to be PerGB2018 by default.\"\n  }\n\n  assert {\n    condition     = azurerm_log_analytics_workspace.this.retention_in_days == 30\n    error_message = \"Expected default retention_in_days to be 30.\"\n  }\n\n  assert {\n    condition     = length(azurerm_log_analytics_workspace.this.tags) == 0\n    error_message = \"Expected tags to be empty by default.\"\n  }\n}\n\nrun \"custom_override\" {\n  command = plan\n\n  variables {\n    retention_in_days = 90\n    tags = {\n      Environment = \"test\"\n    }\n  }\n\n  assert {\n    condition     = azurerm_log_analytics_workspace.this.retention_in_days == 90\n    error_message = \"Expected custom retention_in_days to be 90.\"\n  }\n\n  assert {\n    condition     = azurerm_log_analytics_workspace.this.tags[\"Environment\"] == \"test\"\n    error_message = \"Expected tags to include Environment = test.\"\n  }\n}\n\nrun \"outputs\" {\n  command = plan\n\n  assert {\n    condition     = output.id == \"/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-test/providers/Microsoft.OperationalInsights/workspaces/log-test\"\n    error_message = \"Output id did not match expected mock workspace ID.\"\n  }\n}\n",
+    "modules/log-analytics-workspace/variables.tf": "variable \"name\" {\n  description = \"Workspace name.\"\n  type        = string\n}\n\nvariable \"resource_group_name\" {\n  description = \"Resource group that holds the workspace.\"\n  type        = string\n}\n\nvariable \"location\" {\n  description = \"Azure region.\"\n  type        = string\n}\n\nvariable \"retention_in_days\" {\n  description = \"How long logs are kept.\"\n  type        = number\n  default     = 30\n}\n\nvariable \"tags\" {\n  description = \"Tags for all resources.\"\n  type        = map(string)\n  default     = {}\n}\n",
+    "modules/log-analytics-workspace/versions.tf": "terraform {\n  required_version = \">= 1.9.0\"\n\n  required_providers {\n    azurerm = {\n      source  = \"hashicorp/azurerm\"\n      version = \">= 4.0, < 6.0\"\n    }\n  }\n}\n"
+  },
+  "after_files": {
+    "modules/log-analytics-workspace/main.tf": "resource \"azurerm_log_analytics_workspace\" \"this\" {\n  name                = var.name\n  resource_group_name = var.resource_group_name\n  location            = var.location\n  sku                 = \"PerGB2018\"\n  retention_in_days   = var.retention_in_days\n  tags                = var.tags\n}\n",
+    "modules/log-analytics-workspace/outputs.tf": "output \"id\" {\n  description = \"ID of the workspace.\"\n  value       = azurerm_log_analytics_workspace.this.id\n}\n",
+    "modules/log-analytics-workspace/tests/generated.tftest.hcl": "mock_provider \"azurerm\" {\n  override_during = plan\n  mock_resource \"azurerm_log_analytics_workspace\" {\n    defaults = {\n      id = \"/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-test/providers/Microsoft.OperationalInsights/workspaces/log-test\"\n    }\n  }\n}\n\nvariables {\n  name                = \"law-test\"\n  resource_group_name = \"rg-test\"\n  location            = \"eastus\"\n}\n\nrun \"default_configuration\" {\n  command = plan\n\n  assert {\n    condition     = azurerm_log_analytics_workspace.this.sku == \"PerGB2018\"\n    error_message = \"Expected SKU to be PerGB2018 by default.\"\n  }\n\n  assert {\n    condition     = azurerm_log_analytics_workspace.this.retention_in_days == 30\n    error_message = \"Expected default retention_in_days to be 30.\"\n  }\n\n  assert {\n    condition     = length(azurerm_log_analytics_workspace.this.tags) == 0\n    error_message = \"Expected tags to be empty by default.\"\n  }\n}\n\nrun \"custom_override\" {\n  command = plan\n\n  variables {\n    retention_in_days = 90\n    tags = {\n      Environment = \"test\"\n    }\n  }\n\n  assert {\n    condition     = azurerm_log_analytics_workspace.this.retention_in_days == 90\n    error_message = \"Expected custom retention_in_days to be 90.\"\n  }\n\n  assert {\n    condition     = azurerm_log_analytics_workspace.this.tags[\"Environment\"] == \"test\"\n    error_message = \"Expected tags to include Environment = test.\"\n  }\n}\n\nrun \"outputs\" {\n  command = plan\n\n  assert {\n    condition     = output.id == \"/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-test/providers/Microsoft.OperationalInsights/workspaces/log-test\"\n    error_message = \"Output id did not match expected mock workspace ID.\"\n  }\n}\n",
+    "modules/log-analytics-workspace/variables.tf": "variable \"name\" {\n  description = \"Workspace name.\"\n  type        = string\n}\n\nvariable \"resource_group_name\" {\n  description = \"Resource group that holds the workspace.\"\n  type        = string\n}\n\nvariable \"location\" {\n  description = \"Azure region.\"\n  type        = string\n}\n\nvariable \"retention_in_days\" {\n  description = \"How long logs are kept.\"\n  type        = number\n  default     = 60\n}\n\nvariable \"tags\" {\n  description = \"Tags for all resources.\"\n  type        = map(string)\n  default     = {}\n}\n",
+    "modules/log-analytics-workspace/versions.tf": "terraform {\n  required_version = \">= 1.9.0\"\n\n  required_providers {\n    azurerm = {\n      source  = \"hashicorp/azurerm\"\n      version = \">= 4.0, < 6.0\"\n    }\n  }\n}\n"
+  }
+}

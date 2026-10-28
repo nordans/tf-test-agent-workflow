@@ -4,14 +4,16 @@
 
 A custom Python agent analyzes one module, loads reusable skills, proposes native
 Terraform tests and verifies them in Docker. Authoring currently supports only
-`log-analytics-workspace` and creates one new test file. The agent produces a JSON
+`log-analytics-workspace` and creates or updates its generated test file. The agent produces a JSON
 report and a patch; an operator reviews and applies the proposal. It has no Git
 write tool. Infrastructure source is never changed by the agent.
 
-PR checks run the reviewed tests and a retention mutation check without Gemini
-or Azure credentials. Automatic PR change analysis, live agent invocation on PRs,
-updating existing tests, and posting findings to a PR are **not implemented yet**.
-The final example PR demonstrating the complete workflow will come later.
+PR checks run reviewed tests and a retention mutation check without Gemini or
+Azure credentials. A separate PR agent workflow selects changed modules, analyzes
+immutable before/after snapshots, proposes tests, verifies them and publishes a
+report to the originating PR. The workflow must be merged into main before its
+first automatic run. The final demonstration PR will follow GitHub integration
+verification and broader module support.
 
 ## Running it
 
@@ -50,6 +52,71 @@ overwritten. To reproduce the initial generation, use a disposable checkout
 without `modules/log-analytics-workspace/tests/generated.tftest.hcl` and without
 previous artifacts: this stage intentionally refuses to update an existing file.
 
+The command above is the original standalone bootstrap interface. To analyze and
+verify a PR-like change locally, use the full commit IDs from an existing Git
+checkout and a new output directory:
+
+```sh
+uv run --locked python -B -m test_agent.pr_workflow local --repo /path/to/checkout --base BASE_SHA --head HEAD_SHA --output .agent-output/pr-run
+```
+
+Install Betterleaks 1.9.0 first, or pass --secret-scanner with its executable path.
+This scans the bounded selected source, then sends it to Gemini and executes Docker verification.
+It writes context.json, draft.json, report.json, proposal.patch and comment.md.
+It never publishes to GitHub; local results cannot be published by the PR publisher.
+
+## PR execution
+
+`.github/workflows/pr-test-agent.yml` uses pull_request_target for PRs to main and
+supports manual dispatch with a PR number. Every job checks out the workflow's
+trusted main commit, never the PR branch. Code, dependencies, skills and Dockerfile
+come from that checkout. PR source reaches the controller only as Git blob data.
+There are four workers:
+
+1. Prepare: read PR metadata, compare merge-base to head, select modules and scan
+   the eligible source snapshot with Betterleaks before uploading context.
+2. Propose: call the existing planner and PR author with Gemini; only this worker
+   receives GEMINI_API_KEY. It cannot execute Terraform or write to GitHub.
+3. Verify: independently re-read Git objects, check artifact identity/digests,
+   verify HCL and run the existing sandbox. No Gemini secret or repository-write
+   permission is present. It compares before-source tests, existing head tests,
+   candidate tests and the retention negative control.
+4. Publish: validate the handoffs, recheck PR head/base and update one owned bot
+   comment. Only this worker has pull-requests: write. It executes neither PR code
+   nor Terraform. Failed/missing stages produce failure reports rather than passes.
+
+The PR author loads terraform-unit-testing and calls propose_test_file followed
+by submit_proposal. It has at most four requests and two structural proposals;
+the planner retains its three-request limit. Instructions are in agent/pr-writer.md.
+There is no automatic repair after runtime failure in this separated PR workflow.
+Warnings remain visible; proposed infrastructure requirements stop generation.
+
+Existing assertions and their inputs/mocks must remain. The one allowed update
+to an old condition is a literal default-retention equality, from the before
+source's default to the after source's default, with no retention input override.
+Other behavior changes need human review; this intentionally limits autonomy.
+A no_change decision still requires execution of existing tests and the negative
+control. Passing verification produces a patch, never an automatic commit.
+
+Fork, bot and draft PRs do not invoke Gemini. Docs-only changes do not spend model
+quota. Unsupported modules, stack changes, controller/policy changes, additional
+test files and unsupported module layouts require review. Paths, links, executable
+files, source size/count and the 128-file PR limit are checked before authoring.
+The initial implementation processes one supported module; it does not compute
+a general stack dependency graph. Evidence distinguishes before and after sources.
+
+Concurrency cancels superseded runs. Publishing rechecks both base and head;
+stale/closed PRs are not updated. An API write can still race a subsequent commit,
+so every comment identifies the exact analyzed revisions. Artifacts are retained
+for seven days. GitHub permission/publication behavior must be tested after merge;
+local runs and mocked GitHub tests cannot establish that integration works.
+
+The recorded local retention example under docs/examples/pr-retention changed a
+temporary Git repository's default from 30 to 60. Real Gemini called both skills
+and proposed a two-line test update. Docker observed 3/3 baseline runs, 2/3 old
+head runs, 3/3 candidate runs and a detected mutation. Analysis plus authoring used
+19047 tokens. The example is local, not a claim of a completed GitHub demonstration.
+
 ## Agent, skills and decisions
 
 - `agent/instructions.md` and `test_agent/planner.py` define the planner. Its tools
@@ -62,13 +129,13 @@ previous artifacts: this stage intentionally refuses to update an existing file.
   `load_skill`, `propose_test_file`, `verify_module` and `submit_result`.
   `skills/terraform-unit-testing/SKILL.md` teaches mocked plan tests, concrete
   expectations, known computed IDs and interpretation of verification failures.
-- Python controls tool availability, paths, proposal budgets, HCL acceptance,
+- In the standalone bootstrap mode, Python controls tool availability, paths, proposal budgets, HCL acceptance,
   execution and final status. The model supplies HCL content, never commands,
   arbitrary paths or execution claims. One verification can be followed by one
   repair, with at most two proposals including rejected ones. An ordinary failed
   assertion stops automatic repair and sets `requires_review`. Accepted assertion
   conditions, run identity, inputs and mocks must be preserved during repairs.
-- The planner has at most three API requests and the author at most six. Each
+- The planner has at most three API requests and the standalone author at most six. Each
   request has a 4096 output-token cap and a 60-second socket timeout. There are no
   automatic API retries. The report records actual token usage.
 
@@ -95,8 +162,8 @@ neither project dependencies nor uv.
 
 ## CI security checks
 
-All automatic checks run on opened, updated or reopened PRs targeting `main`,
-without path filters. No Gemini or Azure credentials are supplied. The checks are:
+The five required CI checks run on opened, updated or reopened PRs targeting
+`main`, without path filters. They receive no Gemini or Azure credentials:
 
 | Check | Gate |
 | --- | --- |
@@ -189,9 +256,9 @@ exit code zero alone is insufficient. Container cleanup also runs on timeout.
 
 Policy text comes from `trusted_root`, separately from source data. Local commands
 use the current checkout for both, so run them only when you trust its code.
-This PR's CI is ordinary credential-free test CI, not a privileged agent workflow.
-The future agent workflow must load code/policies from the trusted base and keep
-PR source, diagnostics and model content as untrusted data. Containers share the
+The required CI checks are separate from the privileged PR agent workflow. That
+workflow loads code/policies from the trusted base and keeps PR source,
+diagnostics and model content as untrusted data. Containers share the
 host kernel; these controls are not a complete boundary against hostile native
 code. Do not execute this runner against arbitrary repositories on a sensitive
 self-hosted machine.
@@ -233,8 +300,9 @@ Human review remains necessary, including after a passing verification.
 
 The source allowlist is deliberately module-specific and rejects unsupported
 constructs rather than broadening permissions. Existing unrelated test files are
-visible to the planner but are not executed by this proposal verifier. Other
-modules, existing-test updates, PR diffs and PR reporting remain future stages.
+visible to the standalone planner but are not executed by its proposal verifier;
+the PR controller rejects additional test files rather than silently omitting them.
+Other modules, broader test updates and stack impact analysis remain future stages.
 With more modules and teams, use impact selection, per-module budgets, maintained
 provider runtimes, concurrent isolated jobs and explicit policy ownership.
 Production work also needs abuse/cost controls for public PRs, trusted artifact

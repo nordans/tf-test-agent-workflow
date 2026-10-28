@@ -6,6 +6,31 @@ The starting Terraform code comes from [cf-recruitment/tf-platform-base](https:/
 This repository adds a Terraform test agent; see [SOLUTION.md](SOLUTION.md) for the
 current scope, prerequisites, usage, and limitations.
 
+## PR test agent
+
+After installation on main, the PR test agent analyzes changes to
+log-analytics-workspace in same-repository PRs. Configure the GEMINI_API_KEY
+repository secret. The workflow posts a report with the analyzed revisions,
+findings and test results. Download the pr-result artifact to review the verified
+proposal.patch and apply it to the same PR. The agent does not commit changes.
+
+To rerun, select PR test agent in GitHub Actions, choose main and enter the open
+PR number. Fork, bot and draft PRs do not invoke Gemini. Other modules and changes
+to agent policies are reported as unsupported or requiring review.
+
+For local execution, install Betterleaks 1.9.0, build the Docker runtime, securely set GEMINI_API_KEY and
+provide full Git commit IDs:
+
+```sh
+uv run --locked python -B -m test_agent.build_runtime
+uv run --locked python -B -m test_agent.pr_workflow local --repo /path/to/checkout --base BASE_SHA --head HEAD_SHA --output .agent-output/pr-run
+```
+
+The output directory must be new. Review report.json, proposal.patch and comment.md.
+Local execution scans the selected source before contacting Gemini and never
+publishes a GitHub comment. If Betterleaks is not on PATH, pass --secret-scanner
+with its executable path.
+
 ## Python development
 
 Use Python 3.12 and uv 0.13.6. From the repository root:

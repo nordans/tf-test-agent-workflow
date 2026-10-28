@@ -10,6 +10,7 @@ class StrictModel(BaseModel):
 
 
 class Evidence(StrictModel):
+    revision: Literal["before", "after"] = "after"
     file: str = Field(min_length=1, max_length=200)
     line: int = Field(ge=1)
 
