@@ -43,6 +43,7 @@ class AnalysisContext:
             raise AgentError("Select one module by directory name, not by path.")
         self.module = module
         source_root, trusted_root = source_root.resolve(), trusted_root.resolve()
+        self.trusted_root = trusted_root
         module_dir = source_root / "modules" / module
         for directory in (source_root / "modules", module_dir, module_dir / "tests"):
             if directory.is_symlink() or directory.is_junction():

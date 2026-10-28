@@ -1,0 +1,7 @@
+**
+!runtime/
+!runtime/Dockerfile
+!runtime/providers.tf
+!runtime/azurerm.lock.hcl
+!runtime/terraform.rc
+!runtime/verify.sh

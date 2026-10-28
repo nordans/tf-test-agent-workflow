@@ -1,0 +1,220 @@
+{
+  "mode": "test_proposal",
+  "module": "log-analytics-workspace",
+  "passed": true,
+  "requires_review": false,
+  "tests_executed": true,
+  "analysis": {
+    "mode": "analysis_only",
+    "module": "log-analytics-workspace",
+    "model": "gemini-3.5-flash-lite",
+    "tests_executed": false,
+    "tool_calls": [
+      "load_skill",
+      "read_module",
+      "submit_test_plan"
+    ],
+    "existing_test_files": [],
+    "provenance": {
+      "agent_sha256": "5e9d6287926727b77397749bb0034cc8fc678498bd5e26c17841b35cdd834e92",
+      "skill": {
+        "name": "terraform-change-analysis",
+        "sha256": "161e88aaff0472f5b981cab20e1b1ee13e17ce14f1ba163d435a602c4e3cef2a"
+      },
+      "files": [
+        {
+          "path": "modules/log-analytics-workspace/main.tf",
+          "sha256": "89742ebd333714242c4eb2b3a1912fb1dd29e6df5c617cfecb33e6eddba952d0"
+        },
+        {
+          "path": "modules/log-analytics-workspace/outputs.tf",
+          "sha256": "3dfb7b63242ec018b1281a53cc730289b3ceaa6c0ebf535f3383a5dbe012e0cd"
+        },
+        {
+          "path": "modules/log-analytics-workspace/variables.tf",
+          "sha256": "aa18b8a1196aa15ea4912756ffdd3e1a8a36e82b9749d19dd985ef09d16a3ac6"
+        },
+        {
+          "path": "modules/log-analytics-workspace/versions.tf",
+          "sha256": "811e89659647c8a95c4b92590c764e9c514a9e95b0fdd793f44df01ef92af850"
+        }
+      ]
+    },
+    "usage": {
+      "promptTokenCount": 2348,
+      "candidatesTokenCount": 491,
+      "totalTokenCount": 2839
+    },
+    "plan": {
+      "decision": "add_tests",
+      "summary": "Plan native Terraform tests for the log-analytics-workspace module to verify default configuration, custom retention/tags override, and output correctness.",
+      "test_cases": [
+        {
+          "name": "default_configuration",
+          "category": "default",
+          "basis": "implemented_behavior",
+          "purpose": "Verify default resource arguments when only required variables are provided.",
+          "expected": "azurerm_log_analytics_workspace.this is planned with sku 'PerGB2018' and default retention_in_days = 30.",
+          "evidence": [
+            {
+              "file": "modules/log-analytics-workspace/main.tf",
+              "line": 1
+            },
+            {
+              "file": "modules/log-analytics-workspace/variables.tf",
+              "line": 16
+            }
+          ]
+        },
+        {
+          "name": "custom_override",
+          "category": "override",
+          "basis": "implemented_behavior",
+          "purpose": "Verify custom overrides for retention and tags work correctly.",
+          "expected": "azurerm_log_analytics_workspace.this is planned with custom retention_in_days and tags applied.",
+          "evidence": [
+            {
+              "file": "modules/log-analytics-workspace/main.tf",
+              "line": 6
+            },
+            {
+              "file": "modules/log-analytics-workspace/variables.tf",
+              "line": 22
+            }
+          ]
+        },
+        {
+          "name": "outputs",
+          "category": "output",
+          "basis": "implemented_behavior",
+          "purpose": "Verify that output id correctly reflects the workspace resource id.",
+          "expected": "Output id correctly exposes the id of azurerm_log_analytics_workspace.this.",
+          "evidence": [
+            {
+              "file": "modules/log-analytics-workspace/outputs.tf",
+              "line": 1
+            }
+          ]
+        }
+      ],
+      "findings": [
+        {
+          "severity": "info",
+          "description": "The log-analytics-workspace module has no existing .tftest.hcl test files.",
+          "evidence": [
+            {
+              "file": "modules/log-analytics-workspace/main.tf",
+              "line": 1
+            }
+          ]
+        }
+      ],
+      "limitations": [
+        "Mocked provider plans do not validate live Azure API behavior or service-side constraints."
+      ]
+    }
+  },
+  "tool_calls": [
+    "load_skill",
+    "propose_test_file",
+    "verify_module",
+    "submit_result"
+  ],
+  "attempts": [
+    {
+      "number": 1,
+      "proposal_sha256": "625e3c3b00c1b821b2d79d53e13c87045adb030950d612e130756ac56625a905",
+      "policy": {
+        "accepted": true,
+        "path": "tests/generated.tftest.hcl",
+        "runs": [
+          "default_configuration",
+          "custom_override",
+          "outputs"
+        ]
+      },
+      "verification": {
+        "image_id": "sha256:a8bb3eb3d56525dcc0b9d956e41fe593b24a1eaba0aeee1d3ad8aaae84953f8f",
+        "terraform": {
+          "passed": true,
+          "stage": "test",
+          "runs": [
+            {
+              "name": "default_configuration",
+              "status": "pass"
+            },
+            {
+              "name": "custom_override",
+              "status": "pass"
+            },
+            {
+              "name": "outputs",
+              "status": "pass"
+            }
+          ],
+          "summary": {
+            "status": "pass",
+            "passed": 3,
+            "failed": 0,
+            "errored": 0,
+            "skipped": 0
+          },
+          "assertion_failure": false,
+          "diagnostics": []
+        },
+        "mutation": {
+          "executed": true,
+          "description": "Replace retention variable wiring with constant 30 in a temporary copy.",
+          "detected": true,
+          "terraform": {
+            "passed": false,
+            "stage": "test",
+            "runs": [
+              {
+                "name": "default_configuration",
+                "status": "pass"
+              },
+              {
+                "name": "custom_override",
+                "status": "fail"
+              },
+              {
+                "name": "outputs",
+                "status": "pass"
+              }
+            ],
+            "summary": {
+              "status": "fail",
+              "passed": 2,
+              "failed": 1,
+              "errored": 0,
+              "skipped": 0
+            },
+            "assertion_failure": true,
+            "diagnostics": [
+              {
+                "summary": "Test assertion failed",
+                "detail": "Expected custom retention_in_days to be 90."
+              }
+            ]
+          }
+        },
+        "passed": true,
+        "proposal_sha256": "625e3c3b00c1b821b2d79d53e13c87045adb030950d612e130756ac56625a905"
+      }
+    }
+  ],
+  "author_policy": {
+    "instructions_sha256": "2181a0db0d49f1e55fba0df732b16efba59d4683fb913aa6802b47309eb1d436",
+    "skill": "terraform-unit-testing",
+    "skill_sha256": "00231c49e030a4acabdafea0d06e3db56a5bb729e968d7bf103cdc45858a7c76"
+  },
+  "usage": {
+    "promptTokenCount": 11570,
+    "candidatesTokenCount": 1124,
+    "totalTokenCount": 12694
+  },
+  "proposal_path": "modules/log-analytics-workspace/tests/generated.tftest.hcl",
+  "proposal_sha256": "625e3c3b00c1b821b2d79d53e13c87045adb030950d612e130756ac56625a905",
+  "diff": "--- /dev/null\n+++ modules/log-analytics-workspace/tests/generated.tftest.hcl\n@@ -0,0 +1,63 @@\n+mock_provider \"azurerm\" {\n+  override_during = plan\n+  mock_resource \"azurerm_log_analytics_workspace\" {\n+    defaults = {\n+      id = \"/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-test/providers/Microsoft.OperationalInsights/workspaces/log-test\"\n+    }\n+  }\n+}\n+\n+variables {\n+  name                = \"law-test\"\n+  resource_group_name = \"rg-test\"\n+  location            = \"eastus\"\n+}\n+\n+run \"default_configuration\" {\n+  command = plan\n+\n+  assert {\n+    condition     = azurerm_log_analytics_workspace.this.sku == \"PerGB2018\"\n+    error_message = \"Expected SKU to be PerGB2018 by default.\"\n+  }\n+\n+  assert {\n+    condition     = azurerm_log_analytics_workspace.this.retention_in_days == 30\n+    error_message = \"Expected default retention_in_days to be 30.\"\n+  }\n+\n+  assert {\n+    condition     = length(azurerm_log_analytics_workspace.this.tags) == 0\n+    error_message = \"Expected tags to be empty by default.\"\n+  }\n+}\n+\n+run \"custom_override\" {\n+  command = plan\n+\n+  variables {\n+    retention_in_days = 90\n+    tags = {\n+      Environment = \"test\"\n+    }\n+  }\n+\n+  assert {\n+    condition     = azurerm_log_analytics_workspace.this.retention_in_days == 90\n+    error_message = \"Expected custom retention_in_days to be 90.\"\n+  }\n+\n+  assert {\n+    condition     = azurerm_log_analytics_workspace.this.tags[\"Environment\"] == \"test\"\n+    error_message = \"Expected tags to include Environment = test.\"\n+  }\n+}\n+\n+run \"outputs\" {\n+  command = plan\n+\n+  assert {\n+    condition     = output.id == \"/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-test/providers/Microsoft.OperationalInsights/workspaces/log-test\"\n+    error_message = \"Output id did not match expected mock workspace ID.\"\n+  }\n+}\n"
+}
