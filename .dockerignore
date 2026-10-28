@@ -3,5 +3,13 @@
 !runtime/Dockerfile
 !runtime/providers.tf
 !runtime/azurerm.lock.hcl
+!runtime/external.lock.hcl
+!runtime/external-build/
+!runtime/external-build/go.mod
+!runtime/external-build/go.sum
+!runtime/external-build/provider.tf
 !runtime/terraform.rc
 !runtime/verify.sh
+!runtime/check-module.sh
+!runtime/external-smoke.tf
+!runtime/external-smoke.tftest.hcl

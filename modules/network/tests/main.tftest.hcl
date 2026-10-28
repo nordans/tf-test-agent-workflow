@@ -47,6 +47,16 @@ run "names_follow_the_convention" {
     condition     = azurerm_subnet.this["apps"].name == "snet-apps"
     error_message = "Subnet names must start with snet-."
   }
+
+  assert {
+    condition     = azurerm_subnet.this["apps"].service_endpoint[0].service == "Microsoft.Storage"
+    error_message = "The service endpoint must preserve the configured service."
+  }
+
+  assert {
+    condition     = length(azurerm_subnet.this["data"].service_endpoint) == 0
+    error_message = "A subnet with no service endpoints must retain an empty endpoint list."
+  }
 }
 
 run "rejects_invalid_address_space" {

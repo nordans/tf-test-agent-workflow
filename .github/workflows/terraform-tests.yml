@@ -39,6 +39,9 @@ jobs:
       - name: Verify reviewed tests and retention mutation
         run: uv run --locked --no-dev python -B -m test_agent.verify > verification.json
 
+      - name: Validate all modules and stacks offline
+        run: uv run --locked --no-dev python -B -m test_agent.check_modules > module-validation.json
+
       - name: Install checksum-pinned Trivy
         run: bash .github/scripts/install-security-tool.sh trivy
 
@@ -46,7 +49,7 @@ jobs:
         run: >-
           trivy image --image-src docker --scanners vuln --timeout 5m
           --format json --output image-scan.json
-          tf-test-agent-runtime:tf1.17.1-azurerm5.11.0
+          tf-test-agent-runtime:tf1.17.1-azurerm5.11.0-external2.4.2-patched1
 
       - name: Block high and critical image vulnerabilities
         run: trivy convert --severity HIGH,CRITICAL --exit-code 1 --format table image-scan.json
@@ -58,6 +61,7 @@ jobs:
           name: log-analytics-workspace-verification
           path: |
             verification.json
+            module-validation.json
             image-scan.json
           if-no-files-found: warn
           retention-days: 7
