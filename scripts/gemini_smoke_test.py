@@ -6,7 +6,7 @@ import os
 import sys
 
 
-MODEL = "gemini-3.8-flash"
+MODEL = "gemini-3.5-flash-lite"
 HOST = "generativelanguage.googleapis.com"
 TIMEOUT_SECONDS = 30
 MAX_ERROR_BYTES = 16_384
