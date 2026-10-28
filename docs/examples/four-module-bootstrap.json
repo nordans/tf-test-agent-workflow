@@ -1,0 +1,895 @@
+{
+  "execution": "Local bootstrap with real Gemini and independent native Terraform verification; not a GitHub workflow run.",
+  "source_revision": "b730ed37a5dc7c50d34b82770cb4cb21c94bc717",
+  "selection": {
+    "method": "A temporary Git repository snapshots the four unchanged production modules, including external script text. A second commit adds only a selection comment to each main.tf. The generated patch contains tests only and was applied to the real checkout without those comments.",
+    "base": "3e2d3e0664d5e0d7c980889e814245754eff7325",
+    "head": "c2a8e330cd5405be26bb3b0f5433ce75491a8189",
+    "external_script_execution": "Script text is available to analysis but is never copied into the Terraform test container. Both azurerm and external are mocked."
+  },
+  "runtime_fix": "https://github.com/nordans/tf-test-agent-workflow/pull/15",
+  "autonomy": "The first unattended batch did not pass. Follow-up generations used explicit human review feedback through a local paced client. Production agent tools, HCL policy, mutation gates and runner verification were used unchanged, apart from the separately reviewed runner permissions fix. Final tests include explicit reviewer edits; this is not a claim of fully autonomous coverage generation.",
+  "transport": "The first batch hit HTTP 429. Local follow-ups spaced requests by 12 seconds and allowed at most two bounded 429 retries; this transport wrapper is local evidence, not a production workflow capability.",
+  "attempts": [
+    {
+      "name": "four-module-live-v1",
+      "status": "needs_review",
+      "modules": [
+        {
+          "module": "data-factory",
+          "status": "needs_review",
+          "reason": "HCL policy rejected proposal: PLANNED_OUTPUT_ASSERTIONS_MISSING: principal_id.",
+          "passed_runs": null,
+          "mutation_detected": null
+        },
+        {
+          "module": "databricks-workspace",
+          "status": "needs_review",
+          "reason": "Candidate tests or the bounded source-mutation controls did not pass. See the report artifact.",
+          "passed_runs": 2,
+          "mutation_detected": false
+        },
+        {
+          "module": "function-app",
+          "status": "needs_review",
+          "reason": "Gemini HTTP 429. Gemini status: RESOURCE_EXHAUSTED; ErrorInfo reasons: not provided.",
+          "passed_runs": null,
+          "mutation_detected": null
+        },
+        {
+          "module": "private-endpoint",
+          "status": "needs_review",
+          "reason": "Gemini HTTP 429. Gemini status: RESOURCE_EXHAUSTED; ErrorInfo reasons: not provided.",
+          "passed_runs": null,
+          "mutation_detected": null
+        }
+      ]
+    },
+    {
+      "name": "four-module-reviewed-v2",
+      "status": "needs_review",
+      "modules": [
+        {
+          "module": "data-factory",
+          "status": "needs_review",
+          "reason": "HCL policy rejected proposal: ONLY_COMPUTED_ATTRIBUTES_CAN_BE_MOCKED.",
+          "passed_runs": null,
+          "mutation_detected": null
+        },
+        {
+          "module": "databricks-workspace",
+          "status": "needs_review",
+          "reason": "Candidate tests or the bounded source-mutation controls did not pass. See the report artifact.",
+          "passed_runs": null,
+          "mutation_detected": false
+        },
+        {
+          "module": "function-app",
+          "status": "needs_review",
+          "reason": "HCL policy rejected proposal: ONLY_COMPUTED_ATTRIBUTES_CAN_BE_MOCKED.",
+          "passed_runs": null,
+          "mutation_detected": null
+        },
+        {
+          "module": "private-endpoint",
+          "status": "needs_review",
+          "reason": "Candidate tests or the bounded source-mutation controls did not pass. See the report artifact.",
+          "passed_runs": 2,
+          "mutation_detected": false
+        }
+      ]
+    },
+    {
+      "name": "four-module-fixed-runner-v2",
+      "status": "needs_review",
+      "modules": [
+        {
+          "module": "data-factory",
+          "status": "needs_review",
+          "reason": "HCL policy rejected proposal: ONLY_COMPUTED_ATTRIBUTES_CAN_BE_MOCKED.",
+          "passed_runs": null,
+          "mutation_detected": null
+        },
+        {
+          "module": "databricks-workspace",
+          "status": "verified",
+          "reason": "",
+          "passed_runs": 4,
+          "mutation_detected": true
+        },
+        {
+          "module": "function-app",
+          "status": "needs_review",
+          "reason": "HCL policy rejected proposal: ONLY_COMPUTED_ATTRIBUTES_CAN_BE_MOCKED.",
+          "passed_runs": null,
+          "mutation_detected": null
+        },
+        {
+          "module": "private-endpoint",
+          "status": "needs_review",
+          "reason": "Candidate tests or the bounded source-mutation controls did not pass. See the report artifact.",
+          "passed_runs": 2,
+          "mutation_detected": false
+        }
+      ]
+    },
+    {
+      "name": "four-module-reviewed-v3",
+      "status": "verified",
+      "modules": [
+        {
+          "module": "data-factory",
+          "status": "verified",
+          "reason": "",
+          "passed_runs": 2,
+          "mutation_detected": true
+        },
+        {
+          "module": "databricks-workspace",
+          "status": "verified",
+          "reason": "",
+          "passed_runs": 4,
+          "mutation_detected": true
+        },
+        {
+          "module": "function-app",
+          "status": "verified",
+          "reason": "",
+          "passed_runs": 2,
+          "mutation_detected": true
+        },
+        {
+          "module": "private-endpoint",
+          "status": "verified",
+          "reason": "",
+          "passed_runs": 2,
+          "mutation_detected": true
+        }
+      ]
+    }
+  ],
+  "review_feedback": [
+    "Human review for this local bootstrap (not autonomous runtime repair):\nThe earlier data-factory proposal omitted output.principal_id. Keep all declared\noutput wiring, with nested computed identity mocks and deterministic valid IDs.\nThe earlier databricks suite only checked defaults and invalid SKU; passing those\ndid not establish variable wiring. Include valid caller overrides (standard SKU,\npublic network disabled, custom tags) and assert no_public_ip, name and managed\nresource-group wiring. Retain invalid SKU validation and both output checks.\nFor all four modules, cover existing observable defaults AND meaningful overrides,\nempty/populated collections or optional blocks, output wiring, and concrete fixed\nsecurity behavior. Do not invent requirements or modify infrastructure. For the\nfunction app, mock both providers including external result.revision; scripts must\nnot execute. Cover app-settings merge, role assignment wiring and computed outputs.\nFor private endpoint, cover DNS-zone absent and present, connection wiring and both\noutputs. Read actual source and schema hints before deciding tests. Existing risky\nsettings should be reported to reviewers, not silently changed. Model outputs still\nundergo exactly the same HCL, preservation, native and mutation checks.\n",
+    "Human review for this local bootstrap (not autonomous runtime repair):\nThe earlier data-factory proposal omitted output.principal_id. Keep all declared\noutput wiring, with nested computed identity mocks and deterministic valid IDs.\nThe earlier databricks suite only checked defaults and invalid SKU; passing those\ndid not establish variable wiring. Include valid caller overrides (standard SKU,\npublic network disabled, custom tags) and assert no_public_ip, name and managed\nresource-group wiring. Retain invalid SKU validation and both output checks.\nFor all four modules, cover existing observable defaults AND meaningful overrides,\nempty/populated collections or optional blocks, output wiring, and concrete fixed\nsecurity behavior. Do not invent requirements or modify infrastructure. For the\nfunction app, mock both providers including external result.revision; scripts must\nnot execute. Cover app-settings merge, role assignment wiring and computed outputs.\nFor private endpoint, cover DNS-zone absent and present, connection wiring and both\noutputs. Read actual source and schema hints before deciding tests. Existing risky\nsettings should be reported to reviewers, not silently changed. Model outputs still\nundergo exactly the same HCL, preservation, native and mutation checks.\n\nConcrete review of the second attempt:\n- In mock_resource.defaults, nested identity must be an object with only computed\n  principal_id and tenant_id, for example identity = { principal_id =\n  \"00000000-0000-0000-0000-000000000001\", tenant_id =\n  \"00000000-0000-0000-0000-000000000002\" }. Never mock identity.type. It is configured\n  in the infrastructure and must instead be asserted on the real planned resource.\n- Terraform mock defaults for repeated blocks use a single object applied to all\n  instances, not a list of objects. Use private_service_connection = {\n  private_ip_address = \"10.0.1.5\" } inside defaults; do not mock its configurable\n  name, target ID, subresource_names or is_manual_connection.\n- Use valid deterministic computed resource IDs only where necessary, including a\n  service-plan ID under /subscriptions/00000000-0000-0000-0000-000000000000/\n  resourceGroups/rg-test/providers/Microsoft.Web/serverFarms/asp-test for function\n  app dependency parsing. Do not rely on random computed IDs for parsed references.\n- The private endpoint tags assertion used tags[\"Environment\"]. On a missing key\n  the evaluator errored before a test assertion could fail. Prefer lookup(tags,\n  \"Environment\", \"\") == \"test\" or full-map equality so a missing key yields false.\n  Assert actual service-connection target/subresource/manual configuration and the\n  configured DNS zone ID, not just block counts. Preserve both output checks.\n- Test existing fixed HTTPS/TLS/managed-identity settings and RBAC argument wiring\n  for the function app. App settings merge must keep the mocked BUILD_REVISION\n  even when the caller supplies a conflicting key. Keep meaningful overrides.\nThe sandbox formatting bug was corrected separately in fix/sandbox-formatting.\nNo HCL restriction, assertion requirement or mutation gate was relaxed.\n"
+  ],
+  "reviewer_edits": {
+    "data-factory": "Added missing diagnostic-setting/resource wiring, default empty collections and linked-service configuration checks. Made missing linked-service keys yield assertion failures.",
+    "databricks-workspace": "Added resource-name/default-tags checks and made missing custom tag keys produce assertion failures.",
+    "function-app": "Restored the richer model proposal from trace request 9, splitting its 14 default-run assertions across two runs without losing any of the 19 original assertions; added service-plan/runtime-storage references and service-plan tags. The model's structural retry had removed checks.",
+    "private-endpoint": "Removed explicit null input to exercise the actual DNS default; added subnet/connection/subresource/manual-approval wiring and DNS-group/default-tags checks."
+  },
+  "final_status": "verified",
+  "modules": [
+    {
+      "module": "data-factory",
+      "test_file": "modules/data-factory/tests/generated.tftest.hcl",
+      "test_file_sha256": "0d779bb063fd2c09e355a41ed6de994e9853b31183cb6007d8dc995cc385be6a",
+      "decision": "add_tests",
+      "analysis_tools": [
+        "load_skill",
+        "read_module",
+        "submit_test_plan"
+      ],
+      "authoring_tools": [
+        "load_skill",
+        "propose_test_files",
+        "submit_proposal"
+      ],
+      "analysis_skill": "terraform-change-analysis",
+      "authoring_skill": "terraform-unit-testing",
+      "plan": {
+        "decision": "add_tests",
+        "summary": "Plan native Terraform tests for the data-factory module covering default parameters, public network override, linked storage accounts, diagnostic settings, and required outputs including principal_id.",
+        "test_cases": [
+          {
+            "name": "defaults",
+            "category": "default",
+            "basis": "implemented_behavior",
+            "purpose": "Verify default behavior of the data-factory module with mandatory inputs.",
+            "expected": "Data factory is created with public_network_enabled = true, system-assigned identity, diagnostic settings, and outputs id and principal_id are correctly exposed.",
+            "evidence": [
+              {
+                "revision": "after",
+                "file": "modules/data-factory/main.tf",
+                "line": 1
+              }
+            ]
+          },
+          {
+            "name": "overrides",
+            "category": "override",
+            "basis": "implemented_behavior",
+            "purpose": "Verify custom inputs for public network access, tags, and linked storage accounts.",
+            "expected": "Data factory respects public_network_enabled = false, tags are applied, and linked storage accounts are provisioned via for_each.",
+            "evidence": [
+              {
+                "revision": "after",
+                "file": "modules/data-factory/main.tf",
+                "line": 6
+              }
+            ]
+          }
+        ],
+        "findings": [
+          {
+            "severity": "info",
+            "description": "The data-factory module lacks any native .tftest.hcl test suite.",
+            "evidence": [
+              {
+                "revision": "after",
+                "file": "modules/data-factory/main.tf",
+                "line": 1
+              }
+            ]
+          }
+        ],
+        "limitations": [
+          "Mocked provider plans cannot verify Azure API-level deployment success or managed identity provisioning."
+        ]
+      },
+      "usage": {
+        "promptTokenCount": 21465,
+        "candidatesTokenCount": 1506,
+        "totalTokenCount": 22971
+      },
+      "verification": {
+        "image_id": "sha256:62471846105048c6f0094f664438d36fd0d01d349543ac6bcd2b4b9ea2e07fb9",
+        "terraform": {
+          "passed": true,
+          "stage": "test",
+          "runs": [
+            {
+              "file": "tests/generated.tftest.hcl",
+              "name": "defaults",
+              "status": "pass"
+            },
+            {
+              "file": "tests/generated.tftest.hcl",
+              "name": "overrides",
+              "status": "pass"
+            }
+          ],
+          "summary": {
+            "status": "pass",
+            "passed": 2,
+            "failed": 0,
+            "errored": 0,
+            "skipped": 0
+          },
+          "assertion_failure": false,
+          "diagnostics": []
+        },
+        "mutation": {
+          "executed": true,
+          "detected": true,
+          "attempts": [
+            {
+              "path": "modules/data-factory/main.tf",
+              "description": "Freeze public_network_enabled wiring from var.public_network_enabled to a known literal input.",
+              "detected": true,
+              "terraform": {
+                "passed": false,
+                "stage": "test",
+                "runs": [
+                  {
+                    "file": "tests/generated.tftest.hcl",
+                    "name": "defaults",
+                    "status": "pass"
+                  },
+                  {
+                    "file": "tests/generated.tftest.hcl",
+                    "name": "overrides",
+                    "status": "fail"
+                  }
+                ],
+                "summary": {
+                  "status": "fail",
+                  "passed": 1,
+                  "failed": 1,
+                  "errored": 0,
+                  "skipped": 0
+                },
+                "assertion_failure": true,
+                "diagnostics": [
+                  {
+                    "summary": "Test assertion failed",
+                    "detail": "Expected public_network_enabled to be overridable to false."
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "passed": true,
+        "suite_sha256": "359e97c8ba794165bf807cbd117763b074e7663f52c5c70f954f38332c40c2e1"
+      }
+    },
+    {
+      "module": "databricks-workspace",
+      "test_file": "modules/databricks-workspace/tests/generated.tftest.hcl",
+      "test_file_sha256": "8e622e360cfd80a182bf2e5add2363f78e8aa33073e10f2a87e1ecd7e2b77ba1",
+      "decision": "add_tests",
+      "analysis_tools": [
+        "load_skill",
+        "read_module",
+        "submit_test_plan"
+      ],
+      "authoring_tools": [
+        "load_skill",
+        "propose_test_files",
+        "submit_proposal"
+      ],
+      "analysis_skill": "terraform-change-analysis",
+      "authoring_skill": "terraform-unit-testing",
+      "plan": {
+        "decision": "add_tests",
+        "summary": "Plan native Terraform tests covering default values, SKU validation error handling, valid caller overrides (standard SKU, public_network_access_enabled = false, custom tags), managed resource group name derivation, no_public_ip configuration, and output wiring.",
+        "test_cases": [
+          {
+            "name": "default_configuration",
+            "category": "default",
+            "basis": "implemented_behavior",
+            "purpose": "Verify default variable wiring and resource arguments.",
+            "expected": "Workspace plan succeeds with default SKU 'premium' and public_network_access_enabled = true.",
+            "evidence": [
+              {
+                "revision": "after",
+                "file": "modules/databricks-workspace/variables.tf",
+                "line": 16
+              },
+              {
+                "revision": "after",
+                "file": "modules/databricks-workspace/main.tf",
+                "line": 6
+              }
+            ]
+          },
+          {
+            "name": "invalid_sku_validation",
+            "category": "validation",
+            "basis": "implemented_behavior",
+            "purpose": "Ensure invalid SKU input is rejected by validation rules.",
+            "expected": "Plan fails when an invalid SKU tier is supplied.",
+            "evidence": [
+              {
+                "revision": "after",
+                "file": "modules/databricks-workspace/variables.tf",
+                "line": 21
+              }
+            ]
+          },
+          {
+            "name": "caller_overrides",
+            "category": "override",
+            "basis": "implemented_behavior",
+            "purpose": "Verify caller overrides for SKU, network access, and tags.",
+            "expected": "Workspace plan succeeds with standard SKU, public_network_access_enabled = false, and custom tags.",
+            "evidence": [
+              {
+                "revision": "after",
+                "file": "modules/databricks-workspace/variables.tf",
+                "line": 16
+              },
+              {
+                "revision": "after",
+                "file": "modules/databricks-workspace/variables.tf",
+                "line": 27
+              },
+              {
+                "revision": "after",
+                "file": "modules/databricks-workspace/variables.tf",
+                "line": 33
+              }
+            ]
+          },
+          {
+            "name": "output_wiring",
+            "category": "output",
+            "basis": "implemented_behavior",
+            "purpose": "Ensure outputs are correctly exposed from the resource.",
+            "expected": "Outputs id and workspace_url are correctly wired from azurerm_databricks_workspace.this.",
+            "evidence": [
+              {
+                "revision": "after",
+                "file": "modules/databricks-workspace/outputs.tf",
+                "line": 1
+              },
+              {
+                "revision": "after",
+                "file": "modules/databricks-workspace/outputs.tf",
+                "line": 6
+              }
+            ]
+          }
+        ],
+        "findings": [
+          {
+            "severity": "warning",
+            "description": "The databricks-workspace module lacks any existing .tftest.hcl test suite.",
+            "evidence": [
+              {
+                "revision": "after",
+                "file": "modules/databricks-workspace/main.tf",
+                "line": 1
+              }
+            ]
+          }
+        ],
+        "limitations": [
+          "Mocked provider plans cannot verify Azure API acceptance or active workspace connectivity."
+        ]
+      },
+      "usage": {
+        "promptTokenCount": 17973,
+        "candidatesTokenCount": 1667,
+        "totalTokenCount": 19640
+      },
+      "verification": {
+        "image_id": "sha256:62471846105048c6f0094f664438d36fd0d01d349543ac6bcd2b4b9ea2e07fb9",
+        "terraform": {
+          "passed": true,
+          "stage": "test",
+          "runs": [
+            {
+              "file": "tests/generated.tftest.hcl",
+              "name": "default_configuration",
+              "status": "pass"
+            },
+            {
+              "file": "tests/generated.tftest.hcl",
+              "name": "invalid_sku_validation",
+              "status": "pass"
+            },
+            {
+              "file": "tests/generated.tftest.hcl",
+              "name": "caller_overrides",
+              "status": "pass"
+            },
+            {
+              "file": "tests/generated.tftest.hcl",
+              "name": "output_wiring",
+              "status": "pass"
+            }
+          ],
+          "summary": {
+            "status": "pass",
+            "passed": 4,
+            "failed": 0,
+            "errored": 0,
+            "skipped": 0
+          },
+          "assertion_failure": false,
+          "diagnostics": []
+        },
+        "mutation": {
+          "executed": true,
+          "detected": true,
+          "attempts": [
+            {
+              "path": "modules/databricks-workspace/main.tf",
+              "description": "Freeze name wiring from var.name to a known literal input.",
+              "detected": false,
+              "terraform": {
+                "passed": true,
+                "stage": "test",
+                "runs": [
+                  {
+                    "file": "tests/generated.tftest.hcl",
+                    "name": "default_configuration",
+                    "status": "pass"
+                  },
+                  {
+                    "file": "tests/generated.tftest.hcl",
+                    "name": "invalid_sku_validation",
+                    "status": "pass"
+                  },
+                  {
+                    "file": "tests/generated.tftest.hcl",
+                    "name": "caller_overrides",
+                    "status": "pass"
+                  },
+                  {
+                    "file": "tests/generated.tftest.hcl",
+                    "name": "output_wiring",
+                    "status": "pass"
+                  }
+                ],
+                "summary": {
+                  "status": "pass",
+                  "passed": 4,
+                  "failed": 0,
+                  "errored": 0,
+                  "skipped": 0
+                },
+                "assertion_failure": false,
+                "diagnostics": []
+              }
+            },
+            {
+              "path": "modules/databricks-workspace/main.tf",
+              "description": "Freeze sku wiring from var.sku to a known literal input.",
+              "detected": true,
+              "terraform": {
+                "passed": false,
+                "stage": "test",
+                "runs": [
+                  {
+                    "file": "tests/generated.tftest.hcl",
+                    "name": "default_configuration",
+                    "status": "pass"
+                  },
+                  {
+                    "file": "tests/generated.tftest.hcl",
+                    "name": "invalid_sku_validation",
+                    "status": "pass"
+                  },
+                  {
+                    "file": "tests/generated.tftest.hcl",
+                    "name": "caller_overrides",
+                    "status": "fail"
+                  },
+                  {
+                    "file": "tests/generated.tftest.hcl",
+                    "name": "output_wiring",
+                    "status": "pass"
+                  }
+                ],
+                "summary": {
+                  "status": "fail",
+                  "passed": 3,
+                  "failed": 1,
+                  "errored": 0,
+                  "skipped": 0
+                },
+                "assertion_failure": true,
+                "diagnostics": [
+                  {
+                    "summary": "Test assertion failed",
+                    "detail": "SKU should be overridable to standard."
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "passed": true,
+        "suite_sha256": "879c224d6f317464964d8744e2d1d8905ab445580713ffce890a15deffa7e623"
+      }
+    },
+    {
+      "module": "function-app",
+      "test_file": "modules/function-app/tests/generated.tftest.hcl",
+      "test_file_sha256": "ff293a482ec141ddbb58a21ab87870dda7cd0fb691461ed285f58bc5538dc6da",
+      "decision": "add_tests",
+      "analysis_tools": [
+        "load_skill",
+        "read_module",
+        "submit_test_plan"
+      ],
+      "authoring_tools": [
+        "load_skill",
+        "propose_test_files",
+        "propose_test_files",
+        "submit_proposal"
+      ],
+      "analysis_skill": "terraform-change-analysis",
+      "authoring_skill": "terraform-unit-testing",
+      "plan": {
+        "decision": "add_tests",
+        "summary": "Plan native Terraform tests for the function-app module covering observable defaults, app settings merge with external build revision, role assignment wiring, security/identity configuration, and output values.",
+        "test_cases": [
+          {
+            "name": "defaults",
+            "category": "default",
+            "basis": "implemented_behavior",
+            "purpose": "Verify default settings and resource wiring for the Linux function app.",
+            "expected": "Verifies default Python version 3.12, public network access enabled, HTTPS only, TLS 1.2, system-assigned managed identity, service plan EP1, and role assignment scope/role wiring.",
+            "evidence": [
+              {
+                "revision": "after",
+                "file": "modules/function-app/main.tf",
+                "line": 14
+              },
+              {
+                "revision": "after",
+                "file": "modules/function-app/variables.tf",
+                "line": 26
+              }
+            ]
+          },
+          {
+            "name": "overrides",
+            "category": "override",
+            "basis": "implemented_behavior",
+            "purpose": "Verify custom app settings, network restriction overrides, and tags.",
+            "expected": "Verifies that public network access can be disabled, custom app settings merge correctly with the external build revision, and custom tags are applied.",
+            "evidence": [
+              {
+                "revision": "after",
+                "file": "modules/function-app/main.tf",
+                "line": 39
+              },
+              {
+                "revision": "after",
+                "file": "modules/function-app/variables.tf",
+                "line": 32
+              }
+            ]
+          },
+          {
+            "name": "outputs",
+            "category": "output",
+            "basis": "implemented_behavior",
+            "purpose": "Verify module outputs.",
+            "expected": "Verifies that outputs id and principal_id correctly return the function app ID and managed identity principal ID.",
+            "evidence": [
+              {
+                "revision": "after",
+                "file": "modules/function-app/outputs.tf",
+                "line": 1
+              }
+            ]
+          }
+        ],
+        "findings": [
+          {
+            "severity": "info",
+            "description": "The function-app module has no existing test files and requires test coverage for defaults, app-settings merge with external build info, role assignment wiring, and outputs.",
+            "evidence": [
+              {
+                "revision": "after",
+                "file": "modules/function-app/main.tf",
+                "line": 1
+              },
+              {
+                "revision": "after",
+                "file": "modules/function-app/outputs.tf",
+                "line": 1
+              }
+            ]
+          }
+        ],
+        "limitations": [
+          "External provider scripts must be mocked since test execution environments do not run external shell commands or git."
+        ]
+      },
+      "usage": {
+        "promptTokenCount": 36339,
+        "candidatesTokenCount": 3235,
+        "totalTokenCount": 39574
+      },
+      "verification": {
+        "image_id": "sha256:62471846105048c6f0094f664438d36fd0d01d349543ac6bcd2b4b9ea2e07fb9",
+        "terraform": {
+          "passed": true,
+          "stage": "test",
+          "runs": [
+            {
+              "file": "tests/generated.tftest.hcl",
+              "name": "defaults",
+              "status": "pass"
+            },
+            {
+              "file": "tests/generated.tftest.hcl",
+              "name": "overrides",
+              "status": "pass"
+            },
+            {
+              "file": "tests/generated.tftest.hcl",
+              "name": "identity_and_storage_wiring",
+              "status": "pass"
+            }
+          ],
+          "summary": {
+            "status": "pass",
+            "passed": 3,
+            "failed": 0,
+            "errored": 0,
+            "skipped": 0
+          },
+          "assertion_failure": false,
+          "diagnostics": []
+        },
+        "mutation": {
+          "executed": true,
+          "detected": true,
+          "attempts": [
+            {
+              "path": "modules/function-app/main.tf",
+              "description": "Freeze tags wiring from var.tags to a known literal input.",
+              "detected": true,
+              "terraform": {
+                "passed": false,
+                "stage": "test",
+                "runs": [
+                  {
+                    "file": "tests/generated.tftest.hcl",
+                    "name": "defaults",
+                    "status": "pass"
+                  },
+                  {
+                    "file": "tests/generated.tftest.hcl",
+                    "name": "overrides",
+                    "status": "fail"
+                  },
+                  {
+                    "file": "tests/generated.tftest.hcl",
+                    "name": "identity_and_storage_wiring",
+                    "status": "pass"
+                  }
+                ],
+                "summary": {
+                  "status": "fail",
+                  "passed": 2,
+                  "failed": 1,
+                  "errored": 0,
+                  "skipped": 0
+                },
+                "assertion_failure": true,
+                "diagnostics": [
+                  {
+                    "summary": "Test assertion failed",
+                    "detail": "Custom tags must also reach the service plan."
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "passed": true,
+        "suite_sha256": "1a5558e8fbd78381cd6cd346334590d4673673c886ad4f0f63c8fe9132503761"
+      }
+    },
+    {
+      "module": "private-endpoint",
+      "test_file": "modules/private-endpoint/tests/generated.tftest.hcl",
+      "test_file_sha256": "eb5cd215f9b58359f9da859404247ea0568311965858df3c41390e785c0354ab",
+      "decision": "add_tests",
+      "analysis_tools": [
+        "load_skill",
+        "read_module",
+        "submit_test_plan"
+      ],
+      "authoring_tools": [
+        "load_skill",
+        "propose_test_files",
+        "submit_proposal"
+      ],
+      "analysis_skill": "terraform-change-analysis",
+      "authoring_skill": "terraform-unit-testing",
+      "plan": {
+        "decision": "add_tests",
+        "summary": "Add native Terraform tests for the private-endpoint module covering DNS zone absent and present branches, connection wiring, tags, and outputs.",
+        "test_cases": [
+          {
+            "name": "dns_zone_absent",
+            "category": "default",
+            "basis": "implemented_behavior",
+            "purpose": "Verify default private endpoint deployment without a private DNS zone.",
+            "expected": "Private endpoint creates with correct name, service connection, and without private DNS zone group when private_dns_zone_id is null.",
+            "evidence": [
+              {
+                "revision": "after",
+                "file": "modules/private-endpoint/main.tf",
+                "line": 1
+              }
+            ]
+          },
+          {
+            "name": "dns_zone_present",
+            "category": "override",
+            "basis": "implemented_behavior",
+            "purpose": "Verify private endpoint deployment with private DNS zone group.",
+            "expected": "Private endpoint creates with private DNS zone group configured when private_dns_zone_id is provided.",
+            "evidence": [
+              {
+                "revision": "after",
+                "file": "modules/private-endpoint/main.tf",
+                "line": 14
+              }
+            ]
+          }
+        ],
+        "findings": [
+          {
+            "severity": "info",
+            "description": "Module private-endpoint lacks native tests in tests/ directory.",
+            "evidence": [
+              {
+                "revision": "after",
+                "file": "modules/private-endpoint/main.tf",
+                "line": 1
+              }
+            ]
+          }
+        ],
+        "limitations": [
+          "Mocked plans cannot verify Azure DNS integration or live private connectivity."
+        ]
+      },
+      "usage": {
+        "promptTokenCount": 21251,
+        "candidatesTokenCount": 1495,
+        "totalTokenCount": 22746
+      },
+      "verification": {
+        "image_id": "sha256:62471846105048c6f0094f664438d36fd0d01d349543ac6bcd2b4b9ea2e07fb9",
+        "terraform": {
+          "passed": true,
+          "stage": "test",
+          "runs": [
+            {
+              "file": "tests/generated.tftest.hcl",
+              "name": "dns_zone_absent",
+              "status": "pass"
+            },
+            {
+              "file": "tests/generated.tftest.hcl",
+              "name": "dns_zone_present",
+              "status": "pass"
+            }
+          ],
+          "summary": {
+            "status": "pass",
+            "passed": 2,
+            "failed": 0,
+            "errored": 0,
+            "skipped": 0
+          },
+          "assertion_failure": false,
+          "diagnostics": []
+        },
+        "mutation": {
+          "executed": true,
+          "detected": true,
+          "attempts": [
+            {
+              "path": "modules/private-endpoint/main.tf",
+              "description": "Freeze tags wiring from var.tags to a known literal input.",
+              "detected": true,
+              "terraform": {
+                "passed": false,
+                "stage": "test",
+                "runs": [
+                  {
+                    "file": "tests/generated.tftest.hcl",
+                    "name": "dns_zone_absent",
+                    "status": "fail"
+                  },
+                  {
+                    "file": "tests/generated.tftest.hcl",
+                    "name": "dns_zone_present",
+                    "status": "pass"
+                  }
+                ],
+                "summary": {
+                  "status": "fail",
+                  "passed": 1,
+                  "failed": 1,
+                  "errored": 0,
+                  "skipped": 0
+                },
+                "assertion_failure": true,
+                "diagnostics": [
+                  {
+                    "summary": "Test assertion failed",
+                    "detail": "Tags are incorrect."
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "passed": true,
+        "suite_sha256": "c9c8b37c71626e19ffc46cda6d15329dfabbf501d7d5a563ac4a2b43443f24ac"
+      }
+    }
+  ],
+  "limitations": [
+    "Having test suites for all modules is not complete behavioral or security coverage.",
+    "One detected mutation establishes sensitivity to a sampled regression, not coverage of all attributes.",
+    "Mocked plans do not establish Azure API acceptance, deployed access controls, real connectivity or application/script behavior.",
+    "The model omitted some planned assertions and removed checks during structural repair; human review found these gaps.",
+    "A real GitHub PR workflow must independently reanalyze the actual test commits; these local synthetic revisions are not that PR."
+  ]
+}

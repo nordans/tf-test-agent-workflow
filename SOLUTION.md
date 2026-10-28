@@ -156,8 +156,8 @@ replacement objects and credential inheritance.
 Offline checks run Ruff, pytest, Actionlint/ShellCheck, Betterleaks and pip-audit.
 Pinned actions and checksum-verified tools are used. Terraform CI runs all existing
 module suites, requires tests and a detected mutation for changed modules, and
-reports missing tests or undetected mutations in unchanged modules. Currently four
-modules have suites and four are still missing tests. Network's existing suite
+reports missing tests or undetected mutations in unchanged modules. All eight
+modules have checked-in suites. Network's existing suite
 does not detect the sampled mutations; this is a recorded coverage-work item.
 Passing CI does not mean full repository coverage.
 
@@ -197,6 +197,31 @@ evidence, not a claim that the new workflow has already run from trusted main.
 Synthetic sources are under tests/fixtures. After merge, a real GitHub PR must
 confirm the multi-module publication path.
 
+The existing data-factory, databricks-workspace, function-app and private-endpoint
+modules were bootstrapped together with real Gemini calls, followed by explicit
+reviewer edits and independent verification. Their 11 new scenarios all passed
+and each suite detected a source mutation. The complete repository then passed
+22 native test runs across eight modules; network's sampled mutation gap remains.
+See [the bootstrap record](docs/examples/four-module-bootstrap.json) for decisions,
+skill/tool usage, failed attempts, review feedback, edits and execution results.
+
+The first unattended batch did not pass: there were omitted outputs, insufficient
+mutation sensitivity, forbidden configurable mock fields and HTTP 429 responses.
+A later attempt exposed readonly copied files preventing formatting; the runner
+fix is isolated in [PR #15](https://github.com/nordans/tf-test-agent-workflow/pull/15).
+Local follow-ups used a paced transport wrapper and human feedback. Review also
+restored assertions removed during a model repair, split them into bounded runs,
+and added missing resource wiring checks. These are assisted, reviewed results,
+not evidence that the agent autonomously produced complete coverage on one try.
+
+Existing configuration still warrants owner review: data-factory,
+databricks-workspace and function-app default public network access to true;
+function-app configures AllAllowed for FTPS and Storage
+Blob Data Owner for its runtime storage role. The agent noted missing tests and
+external/identity dependencies; these additional configuration observations came
+from reviewer inspection. Tests document implemented behavior and do not approve
+the security posture or change infrastructure settings.
+
 ## Limits, assumptions and further work
 
 Stack/root impact warnings keep the overall result at needs_review while allowing
@@ -216,9 +241,11 @@ a useful subset, not arbitrary refactors. Tests cannot prove Azure acceptance,
 effective permissions, service behavior, networking, deployment success or script
 logic. Mocked IDs establish wiring only. Generated tests need human review.
 
-Next coverage work is to use this mechanism for the four untested modules and
-improve existing weak spots, followed by a final GitHub example and documentation
-review. With more modules/teams/repositories, use dependency impact analysis,
+Next work is to improve remaining weak spots, especially network mutation
+sensitivity, and confirm the final GitHub example and documentation. Model repair
+needs stronger plan-to-assertion checks and more precise structural diagnostics;
+production transport still needs bounded transient-error handling. With more
+modules/teams/repositories, use dependency impact analysis,
 parallel isolated workers, per-module runtimes and policy ownership, persistent
 progress, stronger artifact attestation and a stronger execution boundary.
 Production extensions include cost/abuse controls, model evaluations for useful
