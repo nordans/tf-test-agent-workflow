@@ -47,3 +47,13 @@ def test_unscanned_context_is_never_uploaded_on_prepare_failure():
     assert len(uploads) == 1
     assert uploads[0].get("if", "success()") == "success()"
     assert uploads[0]["with"]["path"] == "out/context.json"
+
+
+def test_scanning_is_required_for_present_sources_even_when_no_model_will_run():
+    steps = WORKFLOW["jobs"]["prepare"]["steps"]
+    scanner = next(
+        step
+        for step in steps
+        if step.get("name") == "Scan source before sending it to Gemini"
+    )
+    assert scanner["if"] == "steps.context.outputs.scan_required == 'true'"

@@ -11,5 +11,8 @@
 !runtime/terraform.rc
 !runtime/verify.sh
 !runtime/check-module.sh
+!runtime/verify-suite.sh
+!runtime/provider-schemas.sh
+!runtime/schema.tf
 !runtime/external-smoke.tf
 !runtime/external-smoke.tftest.hcl

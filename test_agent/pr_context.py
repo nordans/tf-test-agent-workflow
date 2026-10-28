@@ -17,15 +17,22 @@ from test_agent.context import (
     AgentError,
     AnalysisContext,
 )
-from test_agent.hcl_policy import MODULE, TEST_PATH, validate_sources
 from test_agent.models import StrictModel
+from test_agent.terraform_policy import validate_sources
 
 OID = r"^[0-9a-f]{40}$"
 REPOSITORY = r"^[A-Za-z0-9][A-Za-z0-9_.-]*/[A-Za-z0-9][A-Za-z0-9_.-]*$"
-TARGET = f"modules/{MODULE}/{TEST_PATH}"
 MAX_GIT_BYTES = 1_048_576
+MAX_MODULES = 8
+REVIEW_ONLY_REASONS = {
+    "Stack impact analysis is not supported yet.",
+    "Root Terraform impact analysis is not supported yet.",
+}
 SOURCE_PATH = re.compile(
-    rf"modules/{MODULE}/(?:[A-Za-z0-9_.-]+\.tf|tests/[A-Za-z0-9_.-]+\.tftest\.hcl)"
+    r"modules/[a-z][a-z0-9-]{0,63}/(?:[A-Za-z0-9_][A-Za-z0-9_.-]*\.tf|tests/[A-Za-z0-9_][A-Za-z0-9_.-]*\.tftest\.hcl)"
+)
+SCRIPT_PATH = re.compile(
+    r"modules/[a-z][a-z0-9-]{0,63}/scripts/[A-Za-z0-9_][A-Za-z0-9_.-]*\.(?:sh|py|ps1)"
 )
 
 
@@ -58,19 +65,27 @@ class Change(StrictModel):
 
 
 def check_snapshot(files):
-    if not isinstance(files, dict) or len(files) > MAX_FILES:
+    if not isinstance(files, dict) or len(files) > MAX_FILES * MAX_MODULES:
         raise ValueError("Unsupported snapshot size.")
     if len({path.casefold() for path in files}) != len(files):
         raise ValueError("Case-colliding source paths.")
-    total = 0
+    totals, counts = {}, {}
     for path, content in files.items():
-        if not SOURCE_PATH.fullmatch(path) or not isinstance(content, str):
+        if not (
+            SOURCE_PATH.fullmatch(path) or SCRIPT_PATH.fullmatch(path)
+        ) or not isinstance(content, str):
             raise ValueError("Unsupported snapshot file.")
         size = len(content.encode("utf-8"))
         if size > MAX_FILE_BYTES:
             raise ValueError("Snapshot file exceeds its limit.")
-        total += size
-    if total > MAX_MODULE_BYTES:
+        name = path.split("/")[1]
+        totals[name] = totals.get(name, 0) + size
+        counts[name] = counts.get(name, 0) + 1
+    if (
+        any(size > MAX_MODULE_BYTES for size in totals.values())
+        or any(count > MAX_FILES for count in counts.values())
+        or sum(totals.values()) > 262144
+    ):
         raise ValueError("Snapshot exceeds its total size limit.")
 
 
@@ -78,10 +93,11 @@ class PRBundle(StrictModel):
     identity: PRIdentity
     merge_base: str = Field(pattern=OID)
     changes: list[Change] = Field(max_length=128)
-    selected_modules: list[str] = Field(max_length=32)
+    selected_modules: list[str] = Field(max_length=MAX_MODULES)
     reasons: list[str] = Field(max_length=32)
     before_files: dict[str, str]
     after_files: dict[str, str]
+    module_reasons: dict[str, str] = Field(default_factory=dict)
 
     @model_validator(mode="after")
     def check_files(self):
@@ -92,23 +108,61 @@ class PRBundle(StrictModel):
             raise ValueError("Module selection does not match changed paths.")
         if any(reason not in self.reasons for reason in reasons):
             raise ValueError("An unsupported change was omitted.")
+        if (
+            set(self.module_reasons)
+            | {p.split("/")[1] for p in (*self.before_files, *self.after_files)}
+        ) - set(selected):
+            raise ValueError("Snapshot contains an unselected module.")
         return self
 
     @property
     def eligible(self):
-        return MODULE in self.selected_modules and not self.reasons
+        return not self.blocking_reasons and bool(self.eligible_modules)
 
-    def analysis_context(self, trusted_root: Path):
+    @property
+    def blocking_reasons(self):
+        return [reason for reason in self.reasons if reason not in REVIEW_ONLY_REASONS]
+
+    @property
+    def review_reasons(self):
+        return [reason for reason in self.reasons if reason in REVIEW_ONLY_REASONS]
+
+    @property
+    def eligible_modules(self):
+        return [
+            name
+            for name in self.selected_modules
+            if name not in self.module_reasons and self.module_files(name, "after")
+        ]
+
+    def module_files(self, module, revision):
+        if module not in self.selected_modules or revision not in ("before", "after"):
+            raise AgentError("Select a module and revision from this PR.")
+        files = self.before_files if revision == "before" else self.after_files
+        return {
+            p: value for p, value in files.items() if p.startswith(f"modules/{module}/")
+        }
+
+    def analysis_context(self, trusted_root: Path, module=None):
+        if module is None:
+            if len(self.selected_modules) != 1:
+                raise AgentError("Select one module for analysis.")
+            module = self.selected_modules[0]
+        after, before = (
+            self.module_files(module, "after"),
+            self.module_files(module, "before"),
+        )
         return AnalysisContext.from_snapshot(
-            self.after_files,
-            self.before_files,
+            after,
+            before,
             trusted_root,
             {
                 **self.identity.model_dump(),
                 "merge_base": self.merge_base,
                 "changes": [change.model_dump() for change in self.changes],
-                "diff": source_diff(self.before_files, self.after_files),
+                "diff": source_diff(before, after),
             },
+            module=module,
         )
 
 
@@ -156,9 +210,10 @@ def classify(changes):
                     reasons.add("Unsupported module path.")
                     continue
                 modules.add(parts[1])
-                if parts[1] != MODULE:
-                    reasons.add("Only log-analytics-workspace authoring is supported.")
-                elif not SOURCE_PATH.fullmatch(path) or change.status == "T":
+                if (
+                    not (SOURCE_PATH.fullmatch(path) or SCRIPT_PATH.fullmatch(path))
+                    or change.status == "T"
+                ):
                     reasons.add("Unsupported module file or file-type change.")
     return sorted(modules), sorted(reasons)
 
@@ -203,10 +258,10 @@ class GitRepository:
                 raise AgentError("Git output exceeds its size limit.")
             return data
 
-    def snapshot(self, revision):
+    def snapshot(self, revision, module):
         files = {}
         for entry in self.run(
-            "ls-tree", "-rz", revision, "--", f"modules/{MODULE}/"
+            "ls-tree", "-rz", revision, "--", f"modules/{module}/"
         ).split(b"\0"):
             if not entry:
                 continue
@@ -214,10 +269,13 @@ class GitRepository:
             path = raw_path.decode("utf-8")
             if path.endswith(".md"):
                 continue
-            if not SOURCE_PATH.fullmatch(path):
+            if not (SOURCE_PATH.fullmatch(path) or SCRIPT_PATH.fullmatch(path)):
                 raise AgentError("Unsupported files exist inside the selected module.")
             mode, kind, oid = header.decode("ascii").split()
-            if mode != "100644" or kind != "blob":
+            if (
+                mode != "100644"
+                and not (mode == "100755" and SCRIPT_PATH.fullmatch(path))
+            ) or kind != "blob":
                 raise AgentError(
                     "Linked, executable or submodule inputs are not allowed."
                 )
@@ -263,19 +321,33 @@ class GitRepository:
             if len(changes) > 128:
                 raise AgentError("The PR exceeds the 128-file change limit.")
         selected, reasons = classify(changes)
-        before, after = {}, {}
-        if MODULE in selected and not reasons:
-            before, after = self.snapshot(merge_base), self.snapshot(identity.head_sha)
-            if not before or not after:
-                reasons.append("Added or removed modules require human review.")
-            else:
-                validate_sources(before)
-                validate_sources(after)
-                if any(
-                    path.endswith(".tftest.hcl") and path != TARGET
-                    for path in (*before, *after)
-                ):
-                    reasons.append("Additional test files require a broader verifier.")
+        before, after, module_reasons = {}, {}, {}
+        if len(selected) > MAX_MODULES:
+            raise AgentError("The PR exceeds its eight-module budget.")
+        if not set(reasons) - REVIEW_ONLY_REASONS:
+            for module in selected:
+                try:
+                    old, new = (
+                        self.snapshot(merge_base, module),
+                        self.snapshot(identity.head_sha, module),
+                    )
+                    before.update(old)
+                    after.update(new)
+                    if not any(p.endswith(".tf") for p in new):
+                        raise AgentError("Removed modules require human review.")
+                    validate_sources(new)
+                    if old:
+                        validate_sources(old)
+                    if any(
+                        SCRIPT_PATH.fullmatch(c.path)
+                        and c.path.startswith(f"modules/{module}/")
+                        for c in changes
+                    ):
+                        raise AgentError(
+                            "External program changes are not exercised by mocked Terraform tests."
+                        )
+                except AgentError as error:
+                    module_reasons[module] = str(error)
         return PRBundle(
             identity=identity,
             merge_base=merge_base,
@@ -284,4 +356,5 @@ class GitRepository:
             reasons=reasons,
             before_files=before,
             after_files=after,
+            module_reasons=module_reasons,
         )

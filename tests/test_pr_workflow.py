@@ -8,28 +8,52 @@ from unittest.mock import Mock, patch
 import pytest
 from test_module_planner import FakeClient, tool_calls
 
-from test_agent.context import AgentError, sha256_text
+from test_agent.context import AgentError
 from test_agent.github import MARKER, GitHub
-from test_agent.hcl_policy import validate_update
-from test_agent.pr_author import draft_tests
+from test_agent.pr_author import draft_tests as draft_pr_tests
 from test_agent.pr_context import (
-    TARGET,
     Change,
     GitRepository,
     PRBundle,
     PRIdentity,
     classify,
 )
-from test_agent.pr_results import Analysis, Draft, digest
+from test_agent.pr_results import Analysis, Draft, ModuleDraft, digest, suite_hash
 from test_agent.pr_workflow import (
     proposal_patch,
     render_comment,
     scan_local_source,
     verify_tests,
 )
+from test_agent.terraform_policy import validate_update
 
 ROOT = Path(__file__).resolve().parents[1]
 MODULE = "log-analytics-workspace"
+RELTEST = "tests/generated.tftest.hcl"
+TARGET = f"modules/{MODULE}/{RELTEST}"
+SCHEMA_HASH = "a" * 64
+SCHEMAS = {
+    "registry.terraform.io/hashicorp/azurerm": {
+        "resource_schemas": {
+            "azurerm_log_analytics_workspace": {
+                "block": {
+                    "attributes": {
+                        "id": {"type": "string", "computed": True, "optional": True},
+                        "sku": {"type": "string", "optional": True},
+                        "tags": {"type": ["map", "string"], "optional": True},
+                    }
+                }
+            }
+        },
+        "data_source_schemas": {},
+    }
+}
+
+
+def draft_tests(bundle, root, client):
+    return draft_pr_tests(bundle, root, client, SCHEMAS, SCHEMA_HASH)
+
+
 VARIABLES = f"modules/{MODULE}/variables.tf"
 FIXTURE = ROOT / "tests/fixtures/log_analytics_module"
 # Controller tests own their baseline; infrastructure PRs may change real defaults.
@@ -133,8 +157,8 @@ def draft(bundle, hcl=UPDATED):
     return Draft(
         identity=bundle.identity,
         bundle_sha256=digest(bundle),
-        status="proposed",
-        hcl=hcl,
+        schema_sha256=SCHEMA_HASH,
+        modules=[ModuleDraft(module=MODULE, status="proposed", edits={RELTEST: hcl})],
     )
 
 
@@ -146,17 +170,20 @@ def execution(passed=True, assertion=False):
     }
 
 
-def runner():
-    instance = Mock()
-    instance.execute.side_effect = [(execution(), HCL), (execution(False, True), HCL)]
+def runner(applied=False):
+    instance = Mock(schemas=SCHEMAS, schema_sha256=SCHEMA_HASH)
+    instance.execute.side_effect = [
+        (execution(), {RELTEST: HCL}),
+        (execution(applied, not applied), {RELTEST: UPDATED if applied else HCL}),
+    ]
     instance.verify.return_value = (
         {
             "passed": True,
             "terraform": execution(),
             "mutation": {"detected": True},
-            "proposal_sha256": sha256_text(UPDATED),
+            "suite_sha256": suite_hash({RELTEST: UPDATED}),
         },
-        UPDATED,
+        {RELTEST: UPDATED},
     )
     return instance
 
@@ -198,7 +225,6 @@ def test_docs_only_never_calls_the_model(repository):
         ".github/workflows/new.yml",
         "runtime/Dockerfile",
         "stacks/data-platform/main.tf",
-        "modules/network/main.tf",
         f"modules/{MODULE}/nested/main.tf",
         f"modules/{MODULE}/main.tf.json",
     ],
@@ -219,7 +245,7 @@ def test_cross_module_rename_selects_both_modules():
         ]
     )
     assert selected == [MODULE, "network"]
-    assert reasons
+    assert not reasons
 
 
 @pytest.mark.parametrize(
@@ -270,7 +296,13 @@ def test_snapshot_tampering_cannot_change_selection(repository):
 
 def test_only_source_backed_default_equality_may_change(repository):
     bundle = changed_bundle(repository)
-    validate_update(HCL, UPDATED, bundle.before_files, bundle.after_files)
+    validate_update(
+        bundle.before_files,
+        bundle.after_files,
+        {RELTEST: HCL},
+        {RELTEST: UPDATED},
+        SCHEMAS,
+    )
     for content in (
         UPDATED.replace('== "PerGB2018"', '== "Other"'),
         UPDATED.replace(
@@ -280,9 +312,21 @@ def test_only_source_backed_default_equality_may_change(repository):
         HCL.replace("retention_in_days == 30", "retention_in_days == 90"),
     ):
         with pytest.raises(AgentError):
-            validate_update(HCL, content, bundle.before_files, bundle.after_files)
+            validate_update(
+                bundle.before_files,
+                bundle.after_files,
+                {RELTEST: HCL},
+                {RELTEST: content},
+                SCHEMAS,
+            )
     with pytest.raises(AgentError):
-        validate_update(HCL, UPDATED, bundle.before_files, bundle.before_files)
+        validate_update(
+            bundle.before_files,
+            bundle.before_files,
+            {RELTEST: HCL},
+            {RELTEST: UPDATED},
+            SCHEMAS,
+        )
 
 
 def test_model_stages_use_skill_and_do_not_expose_execution_tools(repository):
@@ -290,14 +334,23 @@ def test_model_stages_use_skill_and_do_not_expose_execution_tools(repository):
     client = FakeClient(
         [
             tool_calls(("load_skill", {"name": "terraform-unit-testing"})),
-            tool_calls(("propose_test_file", {"content": UPDATED})),
+            tool_calls(
+                (
+                    "propose_test_files",
+                    {"files": [{"path": RELTEST, "content": UPDATED}]},
+                )
+            ),
             tool_calls(("submit_proposal", {})),
         ]
     )
     with patch("test_agent.pr_author.run_planner", return_value=analysis()):
         result = draft_tests(bundle, ROOT, client)
     assert result.status == "proposed"
-    assert result.tool_calls == ["load_skill", "propose_test_file", "submit_proposal"]
+    assert result.modules[0].tool_calls == [
+        "load_skill",
+        "propose_test_files",
+        "submit_proposal",
+    ]
     assert all(
         "verify_module" not in [t["name"] for t in req["tools"]]
         for req in client.requests
@@ -327,16 +380,20 @@ def test_identical_model_proposal_is_no_change_but_keeps_planner_evidence(reposi
     client = FakeClient(
         [
             tool_calls(("load_skill", {"name": "terraform-unit-testing"})),
-            tool_calls(("propose_test_file", {"content": UPDATED})),
+            tool_calls(
+                (
+                    "propose_test_files",
+                    {"files": [{"path": RELTEST, "content": UPDATED}]},
+                )
+            ),
             tool_calls(("submit_proposal", {})),
         ]
     )
     with patch("test_agent.pr_author.run_planner", return_value=analysis()):
         result = draft_tests(bundle, ROOT, client)
     assert result.status == "no_change"
-    assert result.hcl is None
-    assert result.analysis.plan.decision == "update_tests"
-    assert "identical" in result.reason
+    assert not result.modules[0].edits
+    assert result.modules[0].analysis.plan.decision == "update_tests"
 
 
 def test_planner_no_change_skips_authoring(repository):
@@ -353,9 +410,12 @@ def test_planner_no_change_skips_authoring(repository):
 def test_verifier_independently_recognises_an_identical_proposal(repository):
     bundle = changed_bundle(repository, applied=True)
     item = draft(bundle)
-    item.analysis = Analysis.model_validate(analysis())
+    item.modules[0].analysis = Analysis.model_validate(analysis())
     worker = runner()
-    worker.execute.side_effect = [(execution(), HCL), (execution(), UPDATED)]
+    worker.execute.side_effect = [
+        (execution(), {RELTEST: HCL}),
+        (execution(), {RELTEST: UPDATED}),
+    ]
     report = verify_tests(bundle, item, worker)
     assert report.status == "no_change_verified"
     worker.verify.assert_called_once()
@@ -373,8 +433,11 @@ def test_baseline_existing_and_candidate_are_distinct_and_patch_updates_file(
     worker = runner()
     result = verify_tests(bundle, draft(bundle), worker)
     assert result.status == "verified"
-    assert result.baseline["passed"] and not result.existing["passed"]
-    assert result.candidate["passed"]
+    assert (
+        result.modules[0].baseline["passed"]
+        and not result.modules[0].existing["passed"]
+    )
+    assert result.modules[0].candidate["passed"]
     patch_text = proposal_patch(bundle, result)
     assert f"--- a/{TARGET}" in patch_text and "== 60" in patch_text
 
@@ -390,8 +453,8 @@ def test_broken_baseline_stops_candidate_execution(repository):
 def test_no_change_still_requires_real_verification(repository):
     bundle = changed_bundle(repository, applied=True)
     item = draft(bundle)
-    item.status, item.hcl = "no_change", None
-    worker = runner()
+    item.modules[0].status, item.modules[0].edits = "no_change", {}
+    worker = runner(applied=True)
     result = verify_tests(bundle, item, worker)
     assert result.status == "no_change_verified"
     worker.verify.assert_called_once()
@@ -415,7 +478,7 @@ def test_rendered_model_content_cannot_create_mentions_or_active_links(repositor
     item = draft(bundle)
     record = analysis()
     record["plan"]["summary"] = "@someone [click](https://evil.invalid) <script>"
-    item.analysis = Analysis.model_validate(record)
+    item.modules[0].analysis = Analysis.model_validate(record)
     result = verify_tests(bundle, item, runner())
     comment = render_comment(bundle, item, result, "123")
     assert "@someone" not in comment and "<script>" not in comment
@@ -481,7 +544,7 @@ def test_merge_base_excludes_unrelated_target_branch_commits(repository):
     "name,args",
     [
         ("verify_module", {}),
-        ("propose_test_file", {"content": UPDATED, "path": "main.tf"}),
+        ("propose_test_files", {"files": [{"path": "../main.tf", "content": UPDATED}]}),
         ("submit_proposal", {"passed": True}),
     ],
 )
@@ -491,11 +554,23 @@ def test_model_cannot_request_execution_arbitrary_paths_or_results(
     bundle = changed_bundle(repository)
     responses = [tool_calls(("load_skill", {"name": "terraform-unit-testing"}))]
     if name == "submit_proposal":
-        responses.append(tool_calls(("propose_test_file", {"content": UPDATED})))
+        responses.append(
+            tool_calls(
+                (
+                    "propose_test_files",
+                    {"files": [{"path": RELTEST, "content": UPDATED}]},
+                )
+            )
+        )
     responses.append(tool_calls((name, args)))
+    if name == "propose_test_files":
+        responses.extend(
+            [tool_calls((name, args)), tool_calls(("submit_proposal", {}))]
+        )
     with patch("test_agent.pr_author.run_planner", return_value=analysis()):
-        with pytest.raises(AgentError):
-            draft_tests(bundle, ROOT, FakeClient(responses))
+        result = draft_tests(bundle, ROOT, FakeClient(responses))
+    assert result.modules[0].status == "needs_review"
+    assert not result.modules[0].edits
 
 
 def test_failed_mutation_cannot_produce_a_verified_patch(repository):
@@ -503,7 +578,7 @@ def test_failed_mutation_cannot_produce_a_verified_patch(repository):
     worker = runner()
     worker.verify.return_value = (
         {"passed": False, "terraform": execution(), "mutation": {"detected": False}},
-        UPDATED,
+        {RELTEST: UPDATED},
     )
     report = verify_tests(bundle, draft(bundle), worker)
     assert report.status == "needs_review"
@@ -559,7 +634,13 @@ def test_verified_label_cannot_override_missing_or_negative_execution_evidence(
             "mutation": {"detected": False},
         },
     ):
-        altered = report.model_copy(update={"candidate": candidate})
+        altered = report.model_copy(
+            update={
+                "modules": [
+                    report.modules[0].model_copy(update={"candidate": candidate})
+                ]
+            }
+        )
         with pytest.raises(ValueError):
             render_comment(bundle, item, altered)
 

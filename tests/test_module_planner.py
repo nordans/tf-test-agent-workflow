@@ -81,6 +81,9 @@ class PlannerTests(unittest.TestCase):
                 tool_calls(
                     ("submit_test_plan", valid_plan() if plan is None else plan)
                 ),
+                tool_calls(
+                    ("submit_test_plan", valid_plan() if plan is None else plan)
+                ),
             ]
         )
 
@@ -173,6 +176,27 @@ class PlannerTests(unittest.TestCase):
             run_planner(self.context(), self.client(plan))["plan"]["decision"],
             "no_change",
         )
+
+    def test_one_structural_correction_keeps_validation_and_request_bound(self):
+        bad = valid_plan()
+        bad["decision"] = "no_change"
+        good = {**bad, "test_cases": []}
+        client = FakeClient(
+            [
+                tool_calls(("load_skill", {"name": SKILL_NAME})),
+                tool_calls(("read_module", {"module": "demo"})),
+                tool_calls(("submit_test_plan", bad)),
+                tool_calls(("submit_test_plan", good)),
+            ]
+        )
+        report = run_planner(self.context(), client)
+        self.assertEqual(report["plan"]["decision"], "no_change")
+        self.assertEqual(len(client.requests), 4)
+        feedback = client.requests[-1]["contents"][-1]["parts"][0]["functionResponse"][
+            "response"
+        ]
+        self.assertFalse(feedback["accepted"])
+        self.assertNotIn("input", feedback["errors"][0])
 
     def test_module_argument_cannot_be_a_path(self):
         for module in ("../demo", "/etc", "C:\\secrets", "demo/main.tf"):

@@ -1,4 +1,4 @@
-"""PR stage commands and a local end-to-end entry point."""
+"""Revision-bound multi-module PR workflow, with independent execution and publication."""
 
 import argparse
 import difflib
@@ -13,18 +13,27 @@ from pathlib import Path
 from test_agent.context import AgentError
 from test_agent.gemini import GeminiClient
 from test_agent.github import MARKER, GitHub
-from test_agent.hcl_policy import validate_proposal, validate_update
 from test_agent.pr_author import draft_tests
-from test_agent.pr_context import TARGET, GitRepository, PRBundle, PRIdentity
+from test_agent.pr_context import GitRepository, PRBundle, PRIdentity
 from test_agent.pr_results import (
     Draft,
+    ModuleDraft,
+    ModuleVerification,
     Verification,
     digest,
     read_json,
+    report_status,
+    same_suites,
     same_test_content,
     write_json,
 )
-from test_agent.sandbox import DockerRunner, docker_environment
+from test_agent.sandbox import docker_environment
+from test_agent.suite_runner import SuiteRunner
+from test_agent.terraform_policy import (
+    test_files,
+    validate_output_coverage,
+    validate_update,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -72,74 +81,135 @@ def scan_local_source(bundle, executable):
             )
 
 
-def verify_tests(bundle, draft, runner):
-    if draft.identity != bundle.identity or draft.bundle_sha256 != digest(bundle):
-        raise AgentError("Draft identity or source snapshot does not match.")
-    report = Verification(
-        identity=bundle.identity,
-        bundle_sha256=digest(bundle),
-        draft_sha256=digest(draft),
-        status="skipped",
-        reason=draft.reason,
+def verify_one(bundle, item, runner):
+    module = item.module
+    report = ModuleVerification(
+        module=module, status="needs_review", reason=item.reason
     )
-    if not bundle.eligible or draft.status not in ("proposed", "no_change"):
-        report.status = "needs_review" if draft.status == "needs_review" else "skipped"
+    if item.status not in ("proposed", "no_change"):
+        report.status = "skipped" if item.status == "skipped" else "needs_review"
         return report
+    before, after = (
+        bundle.module_files(module, "before"),
+        bundle.module_files(module, "after"),
+    )
+    previous, existing = test_files(before, module), test_files(after, module)
+    existing_formatted = existing
+    candidate = {**existing, **item.edits}
     try:
-        previous = bundle.before_files.get(TARGET)
-        if previous is not None:
-            report.baseline, _ = runner.execute(
-                bundle.before_files, validate_proposal(previous)
-            )
+        if set(item.edits) - set(existing) - {"tests/generated.tftest.hcl"}:
+            raise AgentError("Proposal contains a test path not offered by the caller.")
+        suite = validate_update(before, after, previous, candidate, runner.schemas)
+        validate_update(
+            before, after, existing, candidate, runner.schemas, previous_sources=after
+        )
+        validate_output_coverage(
+            before, after, suite, item.analysis.plan if item.analysis else None
+        )
+        if previous:
+            report.baseline, _ = runner.execute(before, previous)
             if not report.baseline["passed"]:
-                report.status, report.reason = (
-                    "needs_review",
-                    "Existing tests already fail on the before source.",
-                )
+                report.reason = "Existing tests already fail on the before source."
                 return report
-        existing = bundle.after_files.get(TARGET)
-        if existing is not None:
+        if existing:
             try:
-                report.existing, _ = runner.execute(
-                    bundle.after_files, validate_proposal(existing)
-                )
+                report.existing, existing_formatted = runner.execute(after, existing)
             except AgentError as error:
                 report.existing = {"passed": False, "policy_error": str(error)}
-        candidate = draft.hcl if draft.status == "proposed" else existing
-        if candidate is None:
-            raise AgentError("No test file is available for verification.")
-        proposal = validate_update(
-            previous, candidate, bundle.before_files, bundle.after_files
-        )
-        report.candidate, report.hcl = runner.verify(bundle.after_files, proposal)
+        report.candidate, report.tests = runner.verify(after, candidate)
         if not report.candidate["passed"]:
-            report.status, report.reason = (
-                "needs_review",
-                "Proposed tests or their retention negative control did not pass.",
-            )
+            report.reason = "Candidate tests or the bounded source-mutation controls did not pass. See the report artifact."
+            return report
+        if same_suites(report.tests, existing_formatted):
+            if not (report.existing or {}).get("passed"):
+                report.reason = (
+                    "Identical tests produced inconsistent execution results."
+                )
+                return report
+            report.status = "no_change_verified"
         else:
-            report.status = (
-                "no_change_verified"
-                if same_test_content(candidate, existing)
-                else "verified"
-            )
+            report.status = "verified"
+        report.reason = ""
     except AgentError as error:
-        report.status, report.reason = "failed", str(error)
+        report.status, report.reason = "needs_review", str(error)
     return report
 
 
-def proposal_patch(bundle, report):
-    if report.status != "verified" or report.hcl is None:
-        return ""
-    previous = bundle.after_files.get(TARGET)
-    return "".join(
-        difflib.unified_diff(
-            (previous or "").splitlines(keepends=True),
-            report.hcl.splitlines(keepends=True),
-            fromfile=f"a/{TARGET}" if previous is not None else "/dev/null",
-            tofile=f"b/{TARGET}",
-        )
+def check_bindings(bundle, draft, report=None):
+    PRBundle.model_validate(bundle.model_dump())
+    Draft.model_validate(draft.model_dump())
+    if draft.identity != bundle.identity or draft.bundle_sha256 != digest(bundle):
+        raise AgentError("Draft identity or source digest does not match.")
+    if [m.module for m in draft.modules] != bundle.selected_modules:
+        raise AgentError("Draft does not account for every selected module.")
+    if report is not None:
+        Verification.model_validate(report.model_dump())
+        if (
+            report.identity != bundle.identity
+            or report.bundle_sha256 != digest(bundle)
+            or report.draft_sha256 != digest(draft)
+        ):
+            raise AgentError("Report identity or stage digests do not match.")
+        if [m.module for m in report.modules] != bundle.selected_modules:
+            raise AgentError("Report does not account for every selected module.")
+        if report.review_reasons != bundle.review_reasons:
+            raise AgentError("Report omitted an unsupported impact warning.")
+
+
+def verify_tests(bundle, draft, runner):
+    check_bindings(bundle, draft)
+    if any(m.status in ("proposed", "no_change") for m in draft.modules):
+        if runner is None or draft.schema_sha256 != runner.schema_sha256:
+            raise AgentError(
+                "Approved provider schemas do not match the proposal stage."
+            )
+    reports = []
+    for item in draft.modules:
+        if bundle.blocking_reasons or item.module in bundle.module_reasons:
+            reports.append(
+                ModuleVerification(
+                    module=item.module,
+                    status="needs_review",
+                    reason="; ".join(bundle.blocking_reasons)
+                    or bundle.module_reasons[item.module],
+                )
+            )
+        else:
+            reports.append(verify_one(bundle, item, runner))
+    return Verification(
+        identity=bundle.identity,
+        bundle_sha256=digest(bundle),
+        draft_sha256=digest(draft),
+        modules=reports,
+        status="needs_review"
+        if bundle.review_reasons and report_status(reports) != "failed"
+        else report_status(reports),
+        reason=draft.reason,
+        review_reasons=bundle.review_reasons,
     )
+
+
+def proposal_patch(bundle, report):
+    if report.status == "failed":
+        return ""
+    chunks = []
+    for module in report.modules:
+        if module.status != "verified":
+            continue
+        current = test_files(bundle.module_files(module.module, "after"), module.module)
+        for path, text in sorted(module.tests.items()):
+            if same_test_content(current.get(path), text):
+                continue
+            target = f"modules/{module.module}/{path}"
+            chunks.extend(
+                difflib.unified_diff(
+                    current.get(path, "").splitlines(keepends=True),
+                    text.splitlines(keepends=True),
+                    fromfile=f"a/{target}" if path in current else "/dev/null",
+                    tofile=f"b/{target}",
+                )
+            )
+    return "".join(chunks)
 
 
 def literal(text):
@@ -148,57 +218,70 @@ def literal(text):
 
 
 def render_comment(bundle, draft, report, run_id=None):
-    Verification.model_validate(report.model_dump())
-    if report.identity != bundle.identity or draft.identity != bundle.identity:
-        raise AgentError("Report targets a different PR.")
-    if report.bundle_sha256 != digest(bundle) or report.draft_sha256 != digest(draft):
-        raise AgentError("Stage artifact digests do not match.")
+    check_bindings(bundle, draft, report)
     identity = bundle.identity
     lines = [
         MARKER,
         "### Terraform test agent",
         f"Result: **{report.status}**",
         f"Source: head {identity.head_sha}, base {identity.base_sha}, merge base {bundle.merge_base}.",
-        "Modules: "
-        + (", ".join(literal(m) for m in bundle.selected_modules) or "none"),
+        "| Module | Verified result |\n|---|---|\n"
+        + "\n".join(f"| {m.module} | {m.status} |" for m in report.modules)
+        if report.modules
+        else "No selected Terraform modules.",
     ]
     if report.reason:
         lines.append(literal(report.reason))
-    if draft.analysis:
-        plan = draft.analysis.plan
-        lines.append("Analysis skill: terraform-change-analysis.")
-        if "load_skill" in draft.tool_calls:
-            lines.append("Authoring skill: terraform-unit-testing.")
-        lines.extend([f"Planner decision: **{plan.decision}**", literal(plan.summary)])
-        for finding in plan.findings:
-            locations = ", ".join(
-                f"{e.revision}:{e.file}:{e.line}" for e in finding.evidence
+    lines.extend(
+        "Review required: " + literal(reason) for reason in report.review_reasons
+    )
+    for item, result in zip(draft.modules, report.modules, strict=True):
+        lines.append(f"#### {item.module}")
+        if item.analysis:
+            plan = item.analysis.plan
+            lines.extend(
+                [
+                    "Analysis skill: terraform-change-analysis.",
+                    f"Planner decision: **{plan.decision}**",
+                    literal(plan.summary),
+                ]
             )
+            if "load_skill" in item.tool_calls:
+                lines.append("Authoring skill: terraform-unit-testing.")
+            for finding in plan.findings[:3]:
+                locations = ", ".join(
+                    f"{e.revision}:{e.file}:{e.line}" for e in finding.evidence[:2]
+                )
+                lines.append(
+                    f"- {finding.severity}: {literal(finding.description[:300])} ({literal(locations)})"
+                )
+            if len(plan.findings) > 3:
+                lines.append("Additional findings are retained in the draft artifact.")
+        if result.reason:
+            lines.append(literal(result.reason[:1000]))
+        for label, execution in (
+            ("Before-source tests", result.baseline),
+            ("Existing head tests", result.existing),
+        ):
+            if execution is not None:
+                lines.append(
+                    f"{label}: {'passed' if execution.get('passed') else 'did not pass'}."
+                )
+        if result.candidate is not None:
+            candidate = result.candidate
+            lines.extend(
+                [
+                    f"Candidate tests: {'passed' if candidate['terraform']['passed'] else 'did not pass'}.",
+                    f"Source mutation detected: {candidate['mutation'].get('detected', False)}.",
+                ]
+            )
+        if result.status == "no_change_verified":
             lines.append(
-                f"- {finding.severity}: {literal(finding.description)} ({literal(locations)})"
+                "No test changes are needed. Existing tests passed independent execution and a source-mutation control."
             )
-    for name, result in (
-        ("Before-source tests", report.baseline),
-        ("Existing head tests", report.existing),
-    ):
-        if result is not None:
-            lines.append(
-                f"{name}: {'passed' if result.get('passed') else 'did not pass'}."
-            )
-    if report.candidate is not None:
-        lines.append(
-            f"Candidate tests: {'passed' if report.candidate['terraform']['passed'] else 'did not pass'}."
-        )
-        lines.append(
-            f"Retention mutation detected: {report.candidate['mutation'].get('detected', False)}."
-        )
-    if report.status == "no_change_verified":
-        lines.append(
-            "No test changes are needed. Existing PR tests passed verification and the retention negative control."
-        )
     if proposal_patch(bundle, report):
         lines.append(
-            "A verified test patch is available in the pr-result artifact. Review and apply it to this same PR; infrastructure was not modified."
+            "The pr-result artifact contains a patch for verified modules. Review and apply it to this same PR. Infrastructure was not modified."
         )
     if run_id is not None:
         if not re.fullmatch(r"[0-9]+", run_id):
@@ -207,9 +290,9 @@ def render_comment(bundle, draft, report, run_id=None):
             f"[Run and artifacts](https://github.com/{identity.repository}/actions/runs/{run_id})"
         )
     lines.append(
-        "Mocked plans do not prove live Azure behavior. Findings and proposed changes require human review."
+        "Mocked plans do not prove live Azure behavior. A detected mutation is not a coverage metric. Findings and proposed changes require human review."
     )
-    return "\n\n".join(lines)[:20000]
+    return "\n\n".join(lines)
 
 
 def event_target():
@@ -266,7 +349,7 @@ def stage_output(name, value):
 
 
 def save_result(directory, bundle, draft, report):
-    Verification.model_validate(report.model_dump())
+    check_bindings(bundle, draft, report)
     write_json(directory / "report.json", report)
     for name, text in (
         ("proposal.patch", proposal_patch(bundle, report)),
@@ -274,6 +357,32 @@ def save_result(directory, bundle, draft, report):
     ):
         with (directory / name).open("x", encoding="utf-8", newline="\n") as file:
             file.write(text)
+
+
+def missing_report(bundle, draft):
+    modules = [
+        ModuleVerification(
+            module=item.module,
+            status="failed"
+            if item.status in ("proposed", "no_change")
+            else item.status,
+            reason="The verification job produced no result."
+            if item.status in ("proposed", "no_change")
+            else item.reason,
+        )
+        for item in draft.modules
+    ]
+    return Verification(
+        identity=bundle.identity,
+        bundle_sha256=digest(bundle),
+        draft_sha256=digest(draft),
+        status="needs_review"
+        if bundle.review_reasons and report_status(modules) != "failed"
+        else report_status(modules),
+        modules=modules,
+        reason=draft.reason,
+        review_reasons=bundle.review_reasons,
+    )
 
 
 def main():
@@ -290,14 +399,17 @@ def main():
     parser.add_argument("--number", type=int, default=1)
     parser.add_argument("--secret-scanner", default="betterleaks")
     args = parser.parse_args()
-    local_runner = None
+    runner = None
     try:
         if args.stage == "prepare":
             bundle = prepare(args.repo)
             write_json(args.output / "context.json", bundle)
-            if bundle.eligible:
+            if bundle.before_files or bundle.after_files:
                 write_snapshot(args.output / "scan", bundle)
             stage_output("eligible", bundle.eligible)
+            stage_output(
+                "scan_required", bool(bundle.before_files or bundle.after_files)
+            )
             return 0
         if args.stage == "local":
             identity = PRIdentity(
@@ -308,8 +420,7 @@ def main():
                 origin="local",
             )
             bundle = GitRepository(args.repo).collect(identity)
-            if bundle.eligible:
-                local_runner = DockerRunner()
+            if bundle.before_files or bundle.after_files:
                 scan_local_source(bundle, args.secret_scanner)
             write_json(args.output / "context.json", bundle)
         else:
@@ -324,7 +435,9 @@ def main():
                     merge_base=identity.base_sha,
                     changes=[],
                     selected_modules=[],
-                    reasons=["Preparation failed; no proposal was verified."],
+                    reasons=[
+                        "Preparation failed; no sources or proposals were verified."
+                    ],
                     before_files={},
                     after_files={},
                 )
@@ -341,8 +454,15 @@ def main():
                         raise AgentError(
                             "PR is no longer eligible for a live model call."
                         )
+                runner = SuiteRunner()
                 client = GeminiClient(os.environ.get("GEMINI_API_KEY", ""))
-            draft = draft_tests(bundle, ROOT, client)
+            draft = draft_tests(
+                bundle,
+                ROOT,
+                client,
+                runner.schemas if runner else None,
+                runner.schema_sha256 if runner else None,
+            )
             write_json(args.output / "draft.json", draft)
             stage_output("verify", draft.status in ("proposed", "no_change"))
             if args.stage == "draft":
@@ -355,27 +475,25 @@ def main():
                 else Draft(
                     identity=bundle.identity,
                     bundle_sha256=digest(bundle),
-                    status="needs_review" if bundle.eligible else "skipped",
-                    reason="The author job produced no result."
-                    if bundle.eligible
-                    else "; ".join(bundle.reasons) or "No supported Terraform changes.",
+                    reason="The author job produced no result.",
+                    modules=[
+                        ModuleDraft(
+                            module=m,
+                            status="needs_review",
+                            reason="The author job produced no result.",
+                        )
+                        for m in bundle.selected_modules
+                    ],
                 )
             )
         if args.stage in ("local", "verify"):
-            if (
-                bundle.eligible
-                and GitRepository(args.repo).collect(bundle.identity) != bundle
-            ):
+            if GitRepository(args.repo).collect(bundle.identity) != bundle:
                 raise AgentError(
                     "Source artifact does not match the recorded Git revisions."
                 )
-            report = verify_tests(
-                bundle,
-                draft,
-                local_runner or DockerRunner()
-                if bundle.eligible and draft.status in ("proposed", "no_change")
-                else None,
-            )
+            if runner is None and draft.status in ("proposed", "no_change"):
+                runner = SuiteRunner()
+            report = verify_tests(bundle, draft, runner)
             save_result(args.output, bundle, draft, report)
             print(f"PR agent result: {report.status}.")
             return (
@@ -383,23 +501,11 @@ def main():
                 if report.status in ("verified", "no_change_verified", "skipped")
                 else 1
             )
-        report_path = args.input / "report.json"
+        path = args.input / "report.json"
         report = (
-            Verification.model_validate(read_json(report_path))
-            if report_path.exists()
-            else Verification(
-                identity=bundle.identity,
-                bundle_sha256=digest(bundle),
-                draft_sha256=digest(draft),
-                status="failed"
-                if bundle.eligible and draft.status in ("proposed", "no_change")
-                else draft.status
-                if draft.status in ("skipped", "needs_review")
-                else "failed",
-                reason="The verification job produced no result."
-                if bundle.eligible and draft.status in ("proposed", "no_change")
-                else draft.reason,
-            )
+            Verification.model_validate(read_json(path))
+            if path.exists()
+            else missing_report(bundle, draft)
         )
         if os.environ.get("VERIFIER_RESULT") == "failure" and report.status in (
             "verified",
@@ -415,7 +521,7 @@ def main():
         ):
             report.status, report.reason = (
                 "failed",
-                "Preparation or model authoring failed. See the workflow run for diagnostics.",
+                "Preparation or model authoring failed; see the workflow diagnostics.",
             )
         event, number = event_target()
         if "pull_request" in event and (
@@ -446,13 +552,13 @@ def main():
         TypeError,
         IndexError,
         UnicodeError,
+        OSError,
+        RecursionError,
     ) as error:
-        message = (
-            str(error)
-            if isinstance(error, AgentError)
-            else "Invalid stage input or configuration."
+        print(
+            f"FAIL: {str(error) if isinstance(error, AgentError) else 'Invalid stage input or configuration.'}",
+            file=sys.stderr,
         )
-        print(f"FAIL: {message}", file=sys.stderr)
         return 1
 
 

@@ -185,13 +185,56 @@ def summarize(raw: bytes, returncode: int, proposal: Proposal) -> tuple[dict, st
     }, formatted or proposal.hcl
 
 
+def run_container(identity, directory, *, script=None, max_bytes=MAX_LOG_BYTES):
+    name = "tf-test-agent-" + uuid.uuid4().hex
+    args = container_args(identity, directory, name)
+    if script is not None:
+        if script not in ("/opt/verify-suite.sh", "/opt/provider-schemas.sh"):
+            raise AgentError("Unsupported sandbox entrypoint.")
+        args[-1:-1] = ["--entrypoint", "/bin/sh"]
+        args.append(script)
+    with tempfile.TemporaryFile() as output:
+        process = None
+        try:
+            process = subprocess.Popen(
+                ["docker", *args],
+                env=docker_environment(),
+                stdout=output,
+                stderr=output,
+            )
+            deadline = time.monotonic() + WALL_SECONDS
+            while process.poll() is None:
+                if (
+                    time.monotonic() >= deadline
+                    or os.fstat(output.fileno()).st_size > max_bytes
+                ):
+                    raise AgentError("Sandbox exceeded its wall time or output limit.")
+                try:
+                    process.wait(timeout=0.1)
+                except subprocess.TimeoutExpired:
+                    pass
+            output.seek(0)
+            raw = output.read(max_bytes + 1)
+            if len(raw) > max_bytes:
+                raise AgentError("Sandbox output exceeds the size limit.")
+            if not raw.strip().startswith(b"{"):
+                raise AgentError("Docker failed before producing sandbox events.")
+            return raw, process.returncode
+        except OSError:
+            raise AgentError("Could not start the Docker sandbox.") from None
+        finally:
+            if process is not None and process.poll() is None:
+                process.kill()
+                process.wait(timeout=10)
+            docker(["rm", "--force", name])
+
+
 class DockerRunner:
     def __init__(self):
         self.image_id = runtime_id()
 
     def execute(self, files: dict[str, str], proposal: Proposal) -> tuple[dict, str]:
         validate_sources(files)
-        name = "tf-test-agent-" + uuid.uuid4().hex
         with tempfile.TemporaryDirectory(prefix="tf-test-agent-") as directory:
             directory = Path(directory)
             directory.chmod(0o755)
@@ -203,44 +246,8 @@ class DockerRunner:
             test_file = directory / "generated.tftest.hcl"
             test_file.write_text(proposal.hcl, encoding="utf-8", newline="\n")
             test_file.chmod(0o444)
-            with tempfile.TemporaryFile() as output:
-                process = None
-                try:
-                    process = subprocess.Popen(
-                        ["docker", *container_args(self.image_id, directory, name)],
-                        env=docker_environment(),
-                        stdout=output,
-                        stderr=output,
-                    )
-                    deadline = time.monotonic() + WALL_SECONDS
-                    while process.poll() is None:
-                        if (
-                            time.monotonic() >= deadline
-                            or os.fstat(output.fileno()).st_size > MAX_LOG_BYTES
-                        ):
-                            raise AgentError(
-                                "Sandbox exceeded its wall time or output limit."
-                            )
-                        try:
-                            process.wait(timeout=0.1)
-                        except subprocess.TimeoutExpired:
-                            pass
-                    output.seek(0)
-                    raw = output.read(MAX_LOG_BYTES + 1)
-                    if len(raw) > MAX_LOG_BYTES:
-                        raise AgentError("Sandbox output exceeds the size limit.")
-                    if not raw.strip().startswith(b"{"):
-                        raise AgentError(
-                            "Docker failed before producing sandbox events."
-                        )
-                    return summarize(raw, process.returncode, proposal)
-                except OSError:
-                    raise AgentError("Could not start the Docker sandbox.") from None
-                finally:
-                    if process is not None and process.poll() is None:
-                        process.kill()
-                        process.wait(timeout=10)
-                    docker(["rm", "--force", name])
+            raw, returncode = run_container(self.image_id, directory)
+            return summarize(raw, returncode, proposal)
 
     def verify(self, files: dict[str, str], proposal: Proposal) -> tuple[dict, str]:
         result, formatted = self.execute(files, proposal)

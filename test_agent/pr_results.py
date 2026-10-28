@@ -1,4 +1,4 @@
-"""Strict stage handoffs; the model never supplies execution status."""
+"""Strict, revision-bound per-module stage artifacts; no model execution claims."""
 
 import json
 from pathlib import Path
@@ -9,8 +9,10 @@ from pydantic import Field, model_validator
 from test_agent.context import AgentError, sha256_text
 from test_agent.models import StrictModel, TestPlan
 from test_agent.pr_context import PRIdentity
+from test_agent.terraform_policy import TEST_PATH, canonical
 
 MAX_JSON_BYTES = 1_048_576
+MODULE_NAME = r"^[a-z][a-z0-9-]{0,63}$"
 
 
 def same_test_content(left: str | None, right: str | None) -> bool:
@@ -19,6 +21,16 @@ def same_test_content(left: str | None, right: str | None) -> bool:
         and right is not None
         and left.replace("\r\n", "\n") == right.replace("\r\n", "\n")
     )
+
+
+def same_suites(left, right):
+    return set(left) == set(right) and all(
+        same_test_content(left[p], right[p]) for p in left
+    )
+
+
+def suite_hash(files):
+    return sha256_text(canonical(files))
 
 
 class Analysis(StrictModel):
@@ -33,16 +45,111 @@ class Analysis(StrictModel):
     plan: TestPlan
 
 
-class Draft(StrictModel):
-    identity: PRIdentity
-    bundle_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+def check_tests(files):
+    if len(files) > 8 or any(
+        not TEST_PATH.fullmatch(p)
+        or not isinstance(t, str)
+        or len(t.encode("utf-8")) > 16384
+        for p, t in files.items()
+    ):
+        raise ValueError("Invalid test artifact paths or size.")
+    if len({p.casefold() for p in files}) != len(files):
+        raise ValueError("Case-colliding test artifact paths.")
+
+
+class ModuleDraft(StrictModel):
+    module: str = Field(pattern=MODULE_NAME)
     status: Literal["proposed", "no_change", "needs_review", "skipped"]
     analysis: Analysis | None = None
-    hcl: str | None = Field(default=None, max_length=32768)
+    edits: dict[str, str] = Field(default_factory=dict)
     tool_calls: list[str] = Field(default_factory=list, max_length=4)
     usage: dict[str, int] = Field(default_factory=dict)
     policy: dict[str, str] = Field(default_factory=dict)
     reason: str = Field(default="", max_length=1000)
+
+    @model_validator(mode="after")
+    def check_module(self):
+        check_tests(self.edits)
+        if self.analysis is not None and self.analysis.module != self.module:
+            raise ValueError("Analysis targets a different module.")
+        if (self.status == "proposed") != bool(self.edits):
+            raise ValueError("Only a proposed draft may contain edits.")
+        return self
+
+
+class Draft(StrictModel):
+    identity: PRIdentity
+    bundle_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    schema_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+    modules: list[ModuleDraft] = Field(default_factory=list, max_length=8)
+    reason: str = Field(default="", max_length=2000)
+
+    @property
+    def status(self):
+        states = {item.status for item in self.modules}
+        if "proposed" in states:
+            return "proposed"
+        if "no_change" in states:
+            return "no_change"
+        if "needs_review" in states:
+            return "needs_review"
+        return "skipped"
+
+    @model_validator(mode="after")
+    def unique_modules(self):
+        if len({m.module for m in self.modules}) != len(self.modules):
+            raise ValueError("Duplicate module draft.")
+        return self
+
+
+class ModuleVerification(StrictModel):
+    module: str = Field(pattern=MODULE_NAME)
+    status: Literal[
+        "verified", "no_change_verified", "needs_review", "skipped", "failed"
+    ]
+    baseline: dict | None = None
+    existing: dict | None = None
+    candidate: dict | None = None
+    tests: dict[str, str] = Field(default_factory=dict)
+    reason: str = Field(default="", max_length=2000)
+
+    @model_validator(mode="after")
+    def checked_result(self):
+        check_tests(self.tests)
+        if self.status in ("verified", "no_change_verified"):
+            candidate = self.candidate or {}
+            if (
+                not self.tests
+                or candidate.get("passed") is not True
+                or not isinstance(candidate.get("terraform"), dict)
+                or not isinstance(candidate.get("mutation"), dict)
+                or candidate.get("terraform", {}).get("passed") is not True
+                or candidate.get("mutation", {}).get("detected") is not True
+                or candidate.get("suite_sha256") != suite_hash(self.tests)
+                or (
+                    self.baseline is not None
+                    and self.baseline.get("passed") is not True
+                )
+                or (
+                    self.status == "no_change_verified"
+                    and (self.existing or {}).get("passed") is not True
+                )
+            ):
+                raise ValueError(
+                    "Verified module requires execution and source-mutation evidence."
+                )
+        return self
+
+
+def report_status(modules):
+    states = {item.status for item in modules}
+    if "failed" in states:
+        return "failed"
+    if "needs_review" in states:
+        return "needs_review"
+    if states and states <= {"verified", "no_change_verified"}:
+        return "verified" if "verified" in states else "no_change_verified"
+    return "needs_review" if states - {"skipped"} else "skipped"
 
 
 class Verification(StrictModel):
@@ -52,32 +159,19 @@ class Verification(StrictModel):
     status: Literal[
         "verified", "no_change_verified", "needs_review", "skipped", "failed"
     ]
-    baseline: dict | None = None
-    existing: dict | None = None
-    candidate: dict | None = None
-    hcl: str | None = Field(default=None, max_length=32768)
-    reason: str = Field(default="", max_length=1000)
+    modules: list[ModuleVerification] = Field(default_factory=list, max_length=8)
+    reason: str = Field(default="", max_length=2000)
+    review_reasons: list[str] = Field(default_factory=list, max_length=32)
 
     @model_validator(mode="after")
-    def check_verified_result(self):
-        if self.status in ("verified", "no_change_verified"):
-            candidate = self.candidate or {}
-            if (
-                self.hcl is None
-                or candidate.get("passed") is not True
-                or not isinstance(candidate.get("terraform"), dict)
-                or not isinstance(candidate.get("mutation"), dict)
-                or candidate.get("terraform", {}).get("passed") is not True
-                or candidate.get("mutation", {}).get("detected") is not True
-                or candidate.get("proposal_sha256") != sha256_text(self.hcl)
-                or (
-                    self.baseline is not None
-                    and self.baseline.get("passed") is not True
-                )
-            ):
-                raise ValueError(
-                    "A verified result requires passing execution and mutation evidence."
-                )
+    def check_aggregate(self):
+        if len({m.module for m in self.modules}) != len(self.modules):
+            raise ValueError("Duplicate module report.")
+        expected = report_status(self.modules)
+        if self.review_reasons and expected != "failed":
+            expected = "needs_review"
+        if self.status != "failed" and self.status != expected:
+            raise ValueError("Overall status does not match module evidence.")
         return self
 
 
@@ -101,7 +195,9 @@ def read_json(path: Path):
 
 
 def write_json(path: Path, model):
+    data = json.dumps(model.model_dump(), indent=2, ensure_ascii=True) + "\n"
+    if len(data.encode("utf-8")) > MAX_JSON_BYTES:
+        raise AgentError("JSON output exceeds its size limit.")
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("x", encoding="utf-8", newline="\n") as file:
-        json.dump(model.model_dump(), file, indent=2, ensure_ascii=True)
-        file.write("\n")
+        file.write(data)

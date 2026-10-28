@@ -24,6 +24,16 @@ Inventory inputs, defaults, validations, resource arguments, conditional or repe
 resources, and outputs. Derive existing coverage from assertions, not filenames or
 the presence of a test directory.
 
+New modules may have no before files and no tests. Plan tests of their implemented
+behavior without assuming a known module name or resource type. The caller handles
+each changed module separately; do not request another module or commands. Scripts
+are source data only. Mocked Terraform tests do not exercise external script logic.
+
+Account for declared outputs. When their wiring is not already asserted, include
+an output test case, using computed provider mocks when needed, or give an explicit
+output-specific reason for exclusion in limitations. Existing test files alone do
+not justify no_change when observable output wiring remains untested.
+
 Propose cases that could catch a meaningful regression: defaults, caller overrides,
 empty or populated collections, conditional branches, output wiring, and security
 properties actually expressed by the module. Prefer specific expected behavior to

@@ -1,103 +1,119 @@
-# Terraform Platform Base
+# Terraform Test Agent
 
-A small Terraform repository for a data platform on Azure: networking, storage, secrets, monitoring, data integration, analytics and a function app.
+A Python agent that proposes and verifies native Terraform tests for GitHub pull
+requests. It discovers changed modules by path, including new modules, and reports
+a separate result for each module. Module names and AzureRM resource types do not
+need registration in the agent.
 
-The starting Terraform code comes from [cf-recruitment/tf-platform-base](https://github.com/cf-recruitment/tf-platform-base).
-This repository adds a Terraform test agent; see [SOLUTION.md](SOLUTION.md) for the
-current scope, prerequisites, usage, and limitations.
+The Terraform platform code starts from
+[cf-recruitment/tf-platform-base](https://github.com/cf-recruitment/tf-platform-base).
+It contains Azure modules and a data-platform stack. Tests use mocked providers
+and require no Azure subscription or credentials.
 
-## PR test agent
+## GitHub workflow
 
-After installation on main, the PR test agent analyzes changes to
-log-analytics-workspace in same-repository PRs. Configure the GEMINI_API_KEY
-repository secret. The workflow posts a report with the analyzed revisions,
-findings and test results. Download the pr-result artifact to review the verified
-proposal.patch and apply it to the same PR. The agent does not commit changes.
+Configure the GEMINI_API_KEY repository secret and install the workflows on main.
+The PR test agent runs automatically for same-repository PRs targeting main:
 
-To rerun, select PR test agent in GitHub Actions, choose main and enter the open
-PR number. Fork, bot and draft PRs do not invoke Gemini. Other modules and changes
-to agent policies are reported as unsupported or requiring review.
+1. Read immutable before/after module snapshots and scan their source for secrets.
+2. Load analysis and testing skills, then propose only allowed test-file changes.
+3. Validate HCL against approved provider schemas and run complete module suites
+   in isolated containers, including bounded source-mutation controls.
+4. Update one bot comment on the originating PR with decisions, findings and results.
 
-For local execution, install Betterleaks 1.9.0, build the Docker runtime, securely set GEMINI_API_KEY and
-provide full Git commit IDs:
+Download the pr-result artifact, review proposal.patch and apply it to that same
+PR. Repeated runs recognize tests that are already current. The agent does not
+commit infrastructure or tests, open another PR, or merge changes.
 
-```sh
-uv run --locked python -B -m test_agent.build_runtime
-uv run --locked python -B -m test_agent.pr_workflow local --repo /path/to/checkout --base BASE_SHA --head HEAD_SHA --output .agent-output/pr-run
-```
+To rerun manually, select PR test agent in Actions, choose main and enter the PR
+number. Fork, bot and draft PRs do not call Gemini. Changes to the controller,
+skills, runtime or workflow require human review.
 
-The output directory must be new. Review report.json, proposal.patch and comment.md.
-Local execution scans the selected source before contacting Gemini and never
-publishes a GitHub comment. If Betterleaks is not on PATH, pass --secret-scanner
-with its executable path.
+## Supported inputs
 
-## Python development
+Modules live directly under modules/<name>/, with top-level .tf files and direct
+tests/*.tftest.hcl files. Up to eight changed modules are processed per run.
+AzureRM and the mocked external provider are available in the pinned runtime.
+New resource types work when supported by that runtime's provider schema.
 
-Use Python 3.12 and uv 0.13.6. From the repository root:
+Remote/nested modules, provider aliases, other providers, backend/cloud
+configuration, filesystem/execution functions and provisioners are outside this
+execution policy. Unsupported modules receive a reason requiring review;
+supported modules in the same PR can still produce verified patches.
+Stack impact analysis and changes to external programs require human review.
+Stack/root impact warnings do not prevent testing independent changed modules;
+the overall report remains needs_review.
+Script text can be read as source data; it is never executed.
 
-```sh
+Existing test files, scenarios, inputs, mock values and unrelated assertions are
+preserved. Source-backed scalar equality updates are supported; Boolean
+expectation changes require review. Every provider must be mocked and every run
+must explicitly use plan.
+
+## Local execution
+
+Requirements: Python 3.12, uv 0.13.6, an amd64 Linux Docker engine, Betterleaks
+1.9.0, Git and a Gemini API key. Building the runtime needs network access;
+Terraform tests run without network access.
+
+~~~sh
 uv sync --locked
+uv run --locked python -B -m test_agent.build_runtime
+~~~
+
+Set GEMINI_API_KEY securely in the process environment, then supply full Git
+commit IDs from a trusted local checkout:
+
+~~~sh
+uv run --locked python -B -m test_agent.pr_workflow local \
+  --repo /path/to/checkout --base BASE_SHA --head HEAD_SHA \
+  --output .agent-output/pr-run
+~~~
+
+Use a new output directory for each run. If Betterleaks is outside PATH, pass
+--secret-scanner with its executable path. The command scans source before any
+model call and saves context.json, draft.json, report.json, proposal.patch and
+comment.md. Local execution never publishes a GitHub comment. Module source is
+sent to Gemini and consumes the API project's quota.
+
+## Development and CI
+
+~~~sh
 uv run --locked ruff check .
 uv run --locked ruff format --check .
 uv run --locked python -B -m pytest
-uv run --locked python -B -m test_agent.build_runtime
+uv run --locked python -B -m test_agent.verify_repository
 uv run --locked python -B -m test_agent.check_modules
-```
+~~~
 
-These same checks run on pull requests. To apply formatting locally, run
-`uv run --locked ruff format .`. Commit dependency changes in `pyproject.toml`
-together with the generated `uv.lock`; use `uv add` or `uv add --dev` to add a
-dependency. See [SOLUTION.md](SOLUTION.md) for agent and Docker commands.
+Code quality CI runs Ruff and pytest. Security checks validate workflows and shell,
+scan Git history for secrets, and audit locked Python dependencies. Terraform CI
+runs all checked-in module suites, validates every module and stack offline, and
+scans the final runtime image. HIGH/CRITICAL image findings fail the check.
 
-PRs also run workflow validation, secret and dependency scans, and a vulnerability
-scan of the Terraform runner image. See [CI security checks](SOLUTION.md#ci-security-checks)
-for the exact gates, reports and current provider findings.
+Changed modules require checked-in tests and detection of a source mutation.
+Missing tests and undetected sampled mutations in unchanged modules remain
+visible in verification.json. Currently four modules have test suites; four still
+need coverage work. A passing CI result does not claim full repository coverage.
+The terraform-verification artifact contains test, compatibility and image reports.
 
-The module compatibility check runs offline init and validation for all modules
-and stacks against the pinned provider schemas in Docker. A fixed mocked-plan
-smoke test also verifies the rebuilt external provider using a deliberately
-nonexistent program. No external data-source program is executed. These checks
-do not prove live Azure compatibility.
+The original standalone module planner remains available with
+python -m test_agent <module>. Its older --generate bootstrap is limited to the
+workspace module; use the Git-based command above for general test authoring.
 
-## Layout
+See [SOLUTION.md](SOLUTION.md) for architecture, budgets, examples and limitations,
+and [the external build notes](runtime/external-build/README.md) for maintenance of
+the rebuilt external provider.
 
-```text
-modules/            Reusable modules. Each has main.tf, variables.tf, outputs.tf and versions.tf.
-  <module>/tests/   Tests for a module, where they exist. Run them from the module folder.
-stacks/
-  data-platform/    The stack that uses the modules. One set of variables per environment in envs/.
-```
+## Repository layout
 
-## Requirements
-
-- Terraform 1.9 or newer
-- Internet access to download providers
-- No Azure subscription or credentials
-
-## Run the tests of a module
-
-The tests use a mocked `azurerm` provider, so they need no credentials.
-
-```sh
-cd modules/storage-account
-terraform init -backend=false
-terraform test
-```
-
-## Check the stack
-
-```sh
-cd stacks/data-platform
-terraform init -backend=false
-terraform fmt -check -recursive ../..
-terraform validate
-```
-
-The stack has no backend configured. A real deployment would need one, and credentials for it.
-
-## Conventions
-
-- Resource files in a stack and modules use `main.tf`, `variables.tf`, `outputs.tf` and `versions.tf`.
-- Use `for_each` rather than `count` for repeated resources.
-- Environments are `dev`, `uat` and `prod`.
-- Format code with `terraform fmt -recursive` before committing.
+~~~text
+agent/                   Trusted agent instructions
+skills/                  Reusable analysis and testing skills
+test_agent/              Python controller, policies and runners
+runtime/                 Pinned Terraform/providers and fixed sandbox scripts
+modules/                 Terraform modules and their native tests
+stacks/data-platform/    Environment stack
+tests/                   Offline controller tests and synthetic module fixtures
+docs/examples/           Recorded example results
+~~~

@@ -11,7 +11,7 @@ import hcl2
 from lark.exceptions import LarkError
 
 from test_agent.context import MAX_FILE_BYTES, AgentError, read_text
-from test_agent.hcl_policy import OPTIONS
+from test_agent.hcl import OPTIONS
 from test_agent.sandbox import (
     MAX_LOG_BYTES,
     container_args,
