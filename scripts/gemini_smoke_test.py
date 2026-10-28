@@ -5,7 +5,6 @@ import json
 import os
 import sys
 
-
 MODEL = "gemini-3.5-flash-lite"
 HOST = "generativelanguage.googleapis.com"
 TIMEOUT_SECONDS = 30
@@ -92,7 +91,9 @@ def main() -> int:
                 429: "Check the project's rate limits and available quota in AI Studio.",
             }
             hint = hints.get(response.status, "Check Gemini service availability.")
-            print(f"FAIL: Gemini returned HTTP {response.status}. {hint}", file=sys.stderr)
+            print(
+                f"FAIL: Gemini returned HTTP {response.status}. {hint}", file=sys.stderr
+            )
             # Read one extra byte so an oversized body is detected, not parsed partially.
             try:
                 diagnostic = error_diagnostics(response.read(MAX_ERROR_BYTES + 1))
@@ -111,11 +112,17 @@ def main() -> int:
             for part in parts
         )
         if candidate.get("finishReason") != "STOP" or not has_text:
-            print("FAIL: Gemini did not return a completed text response.", file=sys.stderr)
+            print(
+                "FAIL: Gemini did not return a completed text response.",
+                file=sys.stderr,
+            )
             return 1
 
     except (OSError, http.client.HTTPException):
-        print("FAIL: network, TLS or timeout error while contacting Gemini.", file=sys.stderr)
+        print(
+            "FAIL: network, TLS or timeout error while contacting Gemini.",
+            file=sys.stderr,
+        )
         return 1
     except (ValueError, KeyError, IndexError, TypeError, AttributeError):
         print("FAIL: Gemini returned an unexpected response format.", file=sys.stderr)
@@ -127,7 +134,12 @@ def main() -> int:
     usage = data.get("usageMetadata", {})
     if not isinstance(usage, dict):
         usage = {}
-    for field in ("promptTokenCount", "candidatesTokenCount", "thoughtsTokenCount", "totalTokenCount"):
+    for field in (
+        "promptTokenCount",
+        "candidatesTokenCount",
+        "thoughtsTokenCount",
+        "totalTokenCount",
+    ):
         count = usage.get(field)
         if type(count) is int:
             print(f"{field}: {count}")

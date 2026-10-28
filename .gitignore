@@ -8,3 +8,5 @@ crash.log
 __pycache__/
 *.py[cod]
 .agent-output/
+.pytest_cache/
+.ruff_cache/

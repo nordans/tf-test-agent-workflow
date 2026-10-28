@@ -6,6 +6,22 @@ The starting Terraform code comes from [cf-recruitment/tf-platform-base](https:/
 This repository adds a Terraform test agent; see [SOLUTION.md](SOLUTION.md) for the
 current scope, prerequisites, usage, and limitations.
 
+## Python development
+
+Use Python 3.12 and uv 0.13.6. From the repository root:
+
+```sh
+uv sync --locked
+uv run --locked ruff check .
+uv run --locked ruff format --check .
+uv run --locked python -B -m pytest
+```
+
+These same checks run on pull requests. To apply formatting locally, run
+`uv run --locked ruff format .`. Commit dependency changes in `pyproject.toml`
+together with the generated `uv.lock`; use `uv add` or `uv add --dev` to add a
+dependency. See [SOLUTION.md](SOLUTION.md) for agent and Docker commands.
+
 ## Layout
 
 ```text
