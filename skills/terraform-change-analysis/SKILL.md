@@ -5,6 +5,12 @@ description: Analyze one Terraform module and its existing native tests to propo
 
 # Terraform change analysis
 
+When read_module includes pull_request and before_files, compare before and after
+using the supplied diff. Evidence defaults to revision after; use revision before
+when citing removed code. Focus the plan on changed behavior and relevant existing
+assertions. A changed literal default can require updating an old expectation.
+Flag weakened security behavior rather than normalizing a weaker expectation.
+
 Read the selected module's source and existing `.tftest.hcl` files with `read_module`.
 Inventory inputs, defaults, validations, resource arguments, conditional or repeated
 resources, and outputs. Derive existing coverage from assertions, not filenames or

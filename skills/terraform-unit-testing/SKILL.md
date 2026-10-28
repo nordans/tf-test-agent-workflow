@@ -5,6 +5,12 @@ description: Turn a supplied Terraform module test plan into mocked native tests
 
 # Native Terraform unit testing
 
+In PR mode, use the actual default from the after source rather than assuming 30.
+Retain the existing test's run names, variables, mocks and unrelated assertions.
+For a changed literal retention default, update only that default equality.
+The caller may expose submit_proposal instead of verify_module: in that mode,
+submit after an accepted proposal and let the separate verifier run the tests.
+
 For this milestone, propose one complete `tests/generated.tftest.hcl` file through
 `propose_test_file`. The tool owns the path. Write HCL, not Markdown fences.
 
@@ -24,7 +30,8 @@ At plan time this makes `output.id` comparable to the known fake ID.
 
 Set name, resource_group_name and location to literal test values in the global
 variables block. Leave retention and tags unset in the default run. Assert the
-actual default retention of 30, SKU PerGB2018 and empty tags. Add an override run
+actual source default retention (30 in the original module), SKU PerGB2018 and
+empty tags. Add an override run
 with retention_in_days = 90 and literal tags, and assert their propagation to the
 resource. Include the output check from the plan. Compare resource/output values
 to concrete expectations, not expressions that merely equal themselves.

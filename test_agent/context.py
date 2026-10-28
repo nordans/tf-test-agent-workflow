@@ -67,6 +67,22 @@ class AnalysisContext:
         ):
             raise AgentError("The module snapshot exceeds the total size limit.")
 
+        self.before_files = {}
+        self.pr_metadata = None
+        self._load_policy(trusted_root)
+
+    @classmethod
+    def from_snapshot(cls, files, before_files, trusted_root, metadata):
+        """Use immutable Git blobs; no PR checkout is imported or executed."""
+        context = cls.__new__(cls)
+        context.module = "log-analytics-workspace"
+        context.trusted_root = trusted_root.resolve()
+        context.files, context.before_files = dict(files), dict(before_files)
+        context.pr_metadata = metadata
+        context._load_policy(context.trusted_root)
+        return context
+
+    def _load_policy(self, trusted_root):
         self.instructions = read_text(
             trusted_root / "agent" / "instructions.md", trusted_root
         )
@@ -87,7 +103,7 @@ class AnalysisContext:
             ) from None
 
     def module_data(self) -> dict:
-        return {
+        result = {
             "module": self.module,
             "files": [
                 {
@@ -103,11 +119,27 @@ class AnalysisContext:
                 path for path in self.files if path.endswith(".tftest.hcl")
             ],
         }
+        if self.pr_metadata is not None:
+            result["pull_request"] = self.pr_metadata
+            result["before_files"] = [
+                {
+                    "path": path,
+                    "numbered_source": "\n".join(
+                        f"{line}: {text}"
+                        for line, text in enumerate(content.splitlines(), start=1)
+                    ),
+                }
+                for path, content in self.before_files.items()
+            ]
+        return result
 
     def validate_evidence(self, plan) -> None:
         for item in [*plan.test_cases, *plan.findings]:
             for evidence in item.evidence:
-                source = self.files.get(evidence.file)
+                files = (
+                    self.before_files if evidence.revision == "before" else self.files
+                )
+                source = files.get(evidence.file)
                 if source is None or evidence.line > len(source.splitlines()):
                     raise AgentError(
                         "Plan evidence must reference a supplied file and an existing line."

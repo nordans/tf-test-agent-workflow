@@ -1,0 +1,146 @@
+{
+  "identity": {
+    "repository": "local/example",
+    "number": 1,
+    "base_sha": "9fe9eb31f74989fbfadca0a0182cd2c38bed768d",
+    "head_sha": "51cda26cde6f705299dff0a19c2001999e5dbf88",
+    "origin": "local"
+  },
+  "bundle_sha256": "f3f7c02d60064e61964b2e2b82b73746bf90e79928e86df8084d7f21d73f4655",
+  "draft_sha256": "617bc5f9cb6f9454c993739aad2672510e4c957244afcca94ce2d95f5a81741f",
+  "status": "verified",
+  "baseline": {
+    "passed": true,
+    "stage": "test",
+    "runs": [
+      {
+        "name": "default_configuration",
+        "status": "pass"
+      },
+      {
+        "name": "custom_override",
+        "status": "pass"
+      },
+      {
+        "name": "outputs",
+        "status": "pass"
+      }
+    ],
+    "summary": {
+      "status": "pass",
+      "passed": 3,
+      "failed": 0,
+      "errored": 0,
+      "skipped": 0
+    },
+    "assertion_failure": false,
+    "diagnostics": []
+  },
+  "existing": {
+    "passed": false,
+    "stage": "test",
+    "runs": [
+      {
+        "name": "default_configuration",
+        "status": "fail"
+      },
+      {
+        "name": "custom_override",
+        "status": "pass"
+      },
+      {
+        "name": "outputs",
+        "status": "pass"
+      }
+    ],
+    "summary": {
+      "status": "fail",
+      "passed": 2,
+      "failed": 1,
+      "errored": 0,
+      "skipped": 0
+    },
+    "assertion_failure": true,
+    "diagnostics": [
+      {
+        "summary": "Test assertion failed",
+        "detail": "Expected default retention_in_days to be 30."
+      }
+    ]
+  },
+  "candidate": {
+    "image_id": "sha256:1a373b07f86fbe2e00d98300dbc104441cf09546d72423e10f665770ce68ca9b",
+    "terraform": {
+      "passed": true,
+      "stage": "test",
+      "runs": [
+        {
+          "name": "default_configuration",
+          "status": "pass"
+        },
+        {
+          "name": "custom_override",
+          "status": "pass"
+        },
+        {
+          "name": "outputs",
+          "status": "pass"
+        }
+      ],
+      "summary": {
+        "status": "pass",
+        "passed": 3,
+        "failed": 0,
+        "errored": 0,
+        "skipped": 0
+      },
+      "assertion_failure": false,
+      "diagnostics": []
+    },
+    "mutation": {
+      "executed": true,
+      "description": "Replace retention variable wiring with constant 30 in a temporary copy.",
+      "detected": true,
+      "terraform": {
+        "passed": false,
+        "stage": "test",
+        "runs": [
+          {
+            "name": "default_configuration",
+            "status": "fail"
+          },
+          {
+            "name": "custom_override",
+            "status": "fail"
+          },
+          {
+            "name": "outputs",
+            "status": "pass"
+          }
+        ],
+        "summary": {
+          "status": "fail",
+          "passed": 1,
+          "failed": 2,
+          "errored": 0,
+          "skipped": 0
+        },
+        "assertion_failure": true,
+        "diagnostics": [
+          {
+            "summary": "Test assertion failed",
+            "detail": "Expected default retention_in_days to be 60."
+          },
+          {
+            "summary": "Test assertion failed",
+            "detail": "Expected custom retention_in_days to be 90."
+          }
+        ]
+      }
+    },
+    "passed": true,
+    "proposal_sha256": "e0877fd0a48e4fda0a8931902bd0751622315260e55b228887a7c77d3e3f5d1a"
+  },
+  "hcl": "mock_provider \"azurerm\" {\n  override_during = plan\n  mock_resource \"azurerm_log_analytics_workspace\" {\n    defaults = {\n      id = \"/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-test/providers/Microsoft.OperationalInsights/workspaces/log-test\"\n    }\n  }\n}\n\nvariables {\n  name                = \"law-test\"\n  resource_group_name = \"rg-test\"\n  location            = \"eastus\"\n}\n\nrun \"default_configuration\" {\n  command = plan\n\n  assert {\n    condition     = azurerm_log_analytics_workspace.this.sku == \"PerGB2018\"\n    error_message = \"Expected SKU to be PerGB2018 by default.\"\n  }\n\n  assert {\n    condition     = azurerm_log_analytics_workspace.this.retention_in_days == 60\n    error_message = \"Expected default retention_in_days to be 60.\"\n  }\n\n  assert {\n    condition     = length(azurerm_log_analytics_workspace.this.tags) == 0\n    error_message = \"Expected tags to be empty by default.\"\n  }\n}\n\nrun \"custom_override\" {\n  command = plan\n\n  variables {\n    retention_in_days = 90\n    tags = {\n      Environment = \"test\"\n    }\n  }\n\n  assert {\n    condition     = azurerm_log_analytics_workspace.this.retention_in_days == 90\n    error_message = \"Expected custom retention_in_days to be 90.\"\n  }\n\n  assert {\n    condition     = azurerm_log_analytics_workspace.this.tags[\"Environment\"] == \"test\"\n    error_message = \"Expected tags to include Environment = test.\"\n  }\n}\n\nrun \"outputs\" {\n  command = plan\n\n  assert {\n    condition     = output.id == \"/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-test/providers/Microsoft.OperationalInsights/workspaces/log-test\"\n    error_message = \"Output id did not match expected mock workspace ID.\"\n  }\n}\n",
+  "reason": ""
+}
