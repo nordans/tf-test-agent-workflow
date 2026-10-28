@@ -15,11 +15,50 @@ from test_agent.hcl_policy import OPTIONS
 from test_agent.sandbox import (
     MAX_LOG_BYTES,
     container_args,
+    decode_events,
     docker,
     runtime_id,
 )
 
 ROOT = Path(__file__).resolve().parents[1]
+EXTERNAL_SMOKE = (
+    "cp -R /opt/external-smoke/. /work/; "
+    "cp /opt/provider/external.lock.hcl /work/.terraform.lock.hcl; "
+    "terraform init -backend=false -input=false -lockfile=readonly -no-color "
+    ">/work/init.log 2>&1 && terraform test -json"
+)
+
+
+def verify_external_mock(image, directory):
+    name = "tf-external-mock-" + uuid.uuid4().hex
+    args = container_args(image, directory, name)
+    args[-1:-1] = ["--entrypoint", "/bin/sh"]
+    try:
+        result = docker([*args, "-c", EXTERNAL_SMOKE], timeout=120)
+        if len(result.stdout) > MAX_LOG_BYTES:
+            raise AgentError("External mock output exceeds its limit.")
+        events = decode_events(result.stdout)
+        summaries = [e["test_summary"] for e in events if "test_summary" in e]
+        completed = [
+            e["test_run"]
+            for e in events
+            if e.get("test_run", {}).get("progress") == "complete"
+        ]
+        passed = (
+            result.returncode == 0
+            and len(summaries) == 1
+            and summaries[0].get("status") == "pass"
+            and summaries[0].get("passed") == 1
+            and all(
+                summaries[0].get(key) == 0 for key in ("failed", "errored", "skipped")
+            )
+            and len(completed) == 1
+            and completed[0].get("run") == "external_program_is_mocked"
+            and completed[0].get("status") == "pass"
+        )
+        return {"passed": passed, "summaries": summaries}
+    finally:
+        docker(["rm", "--force", name])
 
 
 def snapshot(root, destination):
@@ -106,10 +145,14 @@ def validate_repository(root=ROOT):
                 reports.append(report)
             finally:
                 docker(["rm", "--force", name])
+        external_mock = verify_external_mock(image, directory)
     return {
         "image_id": image,
-        "passed": bool(reports) and all(r["valid"] for r in reports),
+        "passed": bool(reports)
+        and all(r["valid"] for r in reports)
+        and external_mock["passed"],
         "modules": reports,
+        "external_mock": external_mock,
     }
 
 

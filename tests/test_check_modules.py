@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 import pytest
 
-from test_agent.check_modules import snapshot, validate_repository
+from test_agent.check_modules import snapshot, validate_repository, verify_external_mock
 from test_agent.context import AgentError
 
 
@@ -74,3 +74,37 @@ def test_malformed_json_cannot_be_accepted_and_container_is_cleaned(source):
         with pytest.raises(AgentError, match="malformed"):
             validate_repository(source)
     assert command.call_args.args[0][:2] == ["rm", "--force"]
+
+
+@pytest.mark.parametrize(
+    "completed,exitcode,expected",
+    [(False, 0, False), (True, 1, False), (True, 0, True)],
+)
+def test_external_mock_requires_completed_run_and_process_success(
+    source, completed, exitcode, expected
+):
+    events = [
+        {
+            "test_summary": {
+                "status": "pass",
+                "passed": 1,
+                "failed": 0,
+                "errored": 0,
+                "skipped": 0,
+            }
+        }
+    ]
+    if completed:
+        events.append(
+            {
+                "test_run": {
+                    "progress": "complete",
+                    "run": "external_program_is_mocked",
+                    "status": "pass",
+                }
+            }
+        )
+    payload = "\n".join(json.dumps(e) for e in events).encode()
+    result = subprocess.CompletedProcess([], exitcode, payload, b"")
+    with patch("test_agent.check_modules.docker", return_value=result):
+        assert verify_external_mock("sha256:" + "a" * 64, source)["passed"] is expected

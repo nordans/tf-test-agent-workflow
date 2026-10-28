@@ -129,8 +129,10 @@ passed all stages but the model reported update_tests while proposing an identic
 file. This prompted the deterministic no-change guard and skill clarification.
 A real local Gemini run against the same PR revisions with these changes chose
 no_change, skipped authoring, passed all three existing test runs and detected the
-retention mutation. GitHub publication with the updated trusted code still needs
-verification after this controller change is merged.
+retention mutation. The subsequent GitHub run
+[40776153357](https://github.com/nordans/tf-test-agent-workflow/actions/runs/40776153357)
+also selected no_change, verified existing tests and the mutation, and updated the
+same bot comment with no_change_verified and an empty patch.
 
 The recorded local retention example under docs/examples/pr-retention changed a
 temporary Git repository's default from 30 to 60. Real Gemini called both skills
@@ -254,10 +256,17 @@ and the stack passed local validation. CI saves module-validation.json alongside
 the existing test verification report.
 
 Adding the official external 2.4.2 package for function-app exposed 5 HIGH and
-1 CRITICAL findings in its embedded Go dependencies. The current image scan
-therefore fails its unchanged gate; no suppressions are added. The runtime is not
-ready for approval until this dependency issue is resolved. Validating a module
-does not run its external program; future plan tests must mock that data source.
+1 CRITICAL findings in its embedded Go dependencies. The runtime instead rebuilds
+the pinned upstream source with Go 1.27.3 and x/net 0.62.0, plus the frozen
+transitive updates, and names it 2.4.2+patched.1. It verifies source/compiler archive
+hashes, Go checksums and the rebuilt package's own Terraform lock hash. The final
+local image scan found no HIGH/CRITICAL and four UNKNOWN findings; no suppressions
+are added. Details and upgrade obligations are in
+[runtime/external-build/README.md](runtime/external-build/README.md).
+This adds local maintenance responsibility until an official package can replace
+it. A fixed networkless plan test proves the provider's external data is mocked:
+its configured program does not exist, yet the expected mock output passes.
+The compatibility check runs this smoke test as well as module validation.
 
 ## Execution and trust boundaries
 

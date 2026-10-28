@@ -54,8 +54,10 @@ scan of the Terraform runner image. See [CI security checks](SOLUTION.md#ci-secu
 for the exact gates, reports and current provider findings.
 
 The module compatibility check runs offline init and validation for all modules
-and stacks against the pinned provider schemas in Docker. It does not run plans,
-execute external data-source programs, or prove live Azure compatibility.
+and stacks against the pinned provider schemas in Docker. A fixed mocked-plan
+smoke test also verifies the rebuilt external provider using a deliberately
+nonexistent program. No external data-source program is executed. These checks
+do not prove live Azure compatibility.
 
 ## Layout
 
