@@ -1,0 +1,110 @@
+{
+  "mode": "analysis_only",
+  "module": "log-analytics-workspace",
+  "model": "gemini-3.5-flash-lite",
+  "tests_executed": false,
+  "tool_calls": [
+    "load_skill",
+    "read_module",
+    "submit_test_plan"
+  ],
+  "existing_test_files": [],
+  "provenance": {
+    "agent_sha256": "5e9d6287926727b77397749bb0034cc8fc678498bd5e26c17841b35cdd834e92",
+    "skill": {
+      "name": "terraform-change-analysis",
+      "sha256": "161e88aaff0472f5b981cab20e1b1ee13e17ce14f1ba163d435a602c4e3cef2a"
+    },
+    "files": [
+      {
+        "path": "modules/log-analytics-workspace/main.tf",
+        "sha256": "89742ebd333714242c4eb2b3a1912fb1dd29e6df5c617cfecb33e6eddba952d0"
+      },
+      {
+        "path": "modules/log-analytics-workspace/outputs.tf",
+        "sha256": "3dfb7b63242ec018b1281a53cc730289b3ceaa6c0ebf535f3383a5dbe012e0cd"
+      },
+      {
+        "path": "modules/log-analytics-workspace/variables.tf",
+        "sha256": "aa18b8a1196aa15ea4912756ffdd3e1a8a36e82b9749d19dd985ef09d16a3ac6"
+      },
+      {
+        "path": "modules/log-analytics-workspace/versions.tf",
+        "sha256": "811e89659647c8a95c4b92590c764e9c514a9e95b0fdd793f44df01ef92af850"
+      }
+    ]
+  },
+  "usage": {
+    "promptTokenCount": 2348,
+    "candidatesTokenCount": 511,
+    "totalTokenCount": 2859
+  },
+  "plan": {
+    "decision": "add_tests",
+    "summary": "Plan native Terraform tests for the log-analytics-workspace module to verify default behavior, caller overrides (retention_in_days and tags), and output correctness.",
+    "test_cases": [
+      {
+        "name": "test_default_workspace",
+        "category": "default",
+        "basis": "implemented_behavior",
+        "purpose": "Verify default input values and resource configuration.",
+        "expected": "Verify that the azurerm_log_analytics_workspace resource is planned with default sku 'PerGB2018' and default retention_in_days 30.",
+        "evidence": [
+          {
+            "file": "modules/log-analytics-workspace/variables.tf",
+            "line": 16
+          },
+          {
+            "file": "modules/log-analytics-workspace/main.tf",
+            "line": 5
+          }
+        ]
+      },
+      {
+        "name": "test_custom_workspace",
+        "category": "override",
+        "basis": "implemented_behavior",
+        "purpose": "Verify caller overrides for retention and tags.",
+        "expected": "Verify that custom retention_in_days and tags are correctly applied to the azurerm_log_analytics_workspace resource.",
+        "evidence": [
+          {
+            "file": "modules/log-analytics-workspace/variables.tf",
+            "line": 16
+          },
+          {
+            "file": "modules/log-analytics-workspace/variables.tf",
+            "line": 22
+          }
+        ]
+      },
+      {
+        "name": "test_output_id",
+        "category": "output",
+        "basis": "implemented_behavior",
+        "purpose": "Ensure module outputs are wired correctly.",
+        "expected": "Verify that the output 'id' correctly references the azurerm_log_analytics_workspace resource ID.",
+        "evidence": [
+          {
+            "file": "modules/log-analytics-workspace/outputs.tf",
+            "line": 1
+          }
+        ]
+      }
+    ],
+    "findings": [
+      {
+        "severity": "info",
+        "description": "The log-analytics-workspace module has no existing .tftest.hcl test files or native tests.",
+        "evidence": [
+          {
+            "file": "modules/log-analytics-workspace/main.tf",
+            "line": 1
+          }
+        ]
+      }
+    ],
+    "limitations": [
+      "Native tests use mock provider plans and cannot verify Azure service deployment, real API behavior, or access control."
+    ]
+  }
+}
