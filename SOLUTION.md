@@ -141,10 +141,12 @@ The test runtime now pins AzureRM 5.11.0; scanning that image found no HIGH or
 CRITICAL vulnerabilities with the database used during review. Four findings with
 UNKNOWN severity remain in the full report and need manual triage; this gate does
 not block unclassified findings. Findings are never used as a baseline to silence
-scans. Required-check enforcement will be configured
-after the workflow changes and provider remediation have been merged; it is not
-enabled by these workflow files themselves. The manual Gemini connectivity check
-must not be made required because it does not run on PRs.
+scans. The active GitHub `main` ruleset requires all five checks above, each from
+the GitHub Actions app. PRs are required, force pushes/deletion are blocked and
+the ruleset has no bypass actors. Requiring an up-to-date branch remains disabled.
+These settings are maintained in GitHub, not enabled by workflow files themselves;
+copying the repository does not copy its protection settings. The manual Gemini
+connectivity check is not required because it does not run on PRs.
 
 Only `log-analytics-workspace` broadens its provider constraint to `>= 4.0, < 6.0`.
 Local mocked tests and the retention mutation pass with both 4.81.0 and 5.11.0.
