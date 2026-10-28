@@ -2,6 +2,10 @@
 
 A small Terraform repository for a data platform on Azure: networking, storage, secrets, monitoring, data integration, analytics and a function app.
 
+The starting Terraform code comes from [cf-recruitment/tf-platform-base](https://github.com/cf-recruitment/tf-platform-base).
+This repository adds a test-planning agent; see [SOLUTION.md](SOLUTION.md) for the
+current scope, prerequisites, usage, and limitations.
+
 ## Layout
 
 ```text

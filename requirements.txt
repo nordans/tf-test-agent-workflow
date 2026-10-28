@@ -1,0 +1,7 @@
+# Runtime dependencies, including resolved transitive versions.
+annotated-types==0.8.0
+pydantic==2.14.1
+pydantic_core==2.50.1
+PyYAML==6.0.3
+typing-inspection==0.4.4
+typing_extensions==4.16.0
