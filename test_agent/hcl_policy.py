@@ -116,7 +116,8 @@ def validate_sources(files: dict[str, str]) -> None:
         "INVALID_PROVIDER",
     )
     require(
-        provider["source"] == "hashicorp/azurerm" and provider["version"] == "~> 4.0",
+        provider["source"] == "hashicorp/azurerm"
+        and provider["version"] == ">= 4.0, < 6.0",
         "UNAPPROVED_PROVIDER",
     )
     resource = one_block(

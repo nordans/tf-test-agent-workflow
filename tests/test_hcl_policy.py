@@ -74,3 +74,14 @@ class HclPolicyTests(unittest.TestCase):
         )
         with self.assertRaises(AgentError):
             validate_sources(files)
+
+    def test_source_requires_the_reviewed_provider_source_and_constraint(self):
+        original = AnalysisContext(ROOT, ROOT, "log-analytics-workspace").files
+        path = "modules/log-analytics-workspace/versions.tf"
+        for before, after in (
+            (">= 4.0, < 6.0", ">= 4.0"),
+            ("hashicorp/azurerm", "example/azurerm"),
+        ):
+            files = {**original, path: original[path].replace(before, after)}
+            with self.subTest(after=after), self.assertRaises(AgentError):
+                validate_sources(files)

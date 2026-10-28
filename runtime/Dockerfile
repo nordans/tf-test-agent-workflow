@@ -8,7 +8,7 @@ COPY runtime/azurerm.lock.hcl ./.terraform.lock.hcl
 # An unpacked mirror lets runtime init symlink to the trusted executable here.
 RUN terraform init -backend=false -input=false \
     && mkdir /opt/provider-mirror \
-    && cp -R .terraform/providers/registry.terraform.io /opt/provider-mirror/
+    && mv .terraform/providers/registry.terraform.io /opt/provider-mirror/
 
 COPY runtime/terraform.rc /opt/terraform.rc
 COPY runtime/verify.sh /opt/verify.sh

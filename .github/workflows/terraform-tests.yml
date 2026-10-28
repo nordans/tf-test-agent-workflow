@@ -46,7 +46,7 @@ jobs:
         run: >-
           trivy image --image-src docker --scanners vuln --timeout 5m
           --format json --output image-scan.json
-          tf-test-agent-runtime:tf1.17.1-azurerm4.81.0
+          tf-test-agent-runtime:tf1.17.1-azurerm5.11.0
 
       - name: Block high and critical image vulnerabilities
         run: trivy convert --severity HIGH,CRITICAL --exit-code 1 --format table image-scan.json
