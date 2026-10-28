@@ -236,13 +236,28 @@ These settings are maintained in GitHub, not enabled by workflow files themselve
 copying the repository does not copy its protection settings. The manual Gemini
 connectivity check is not required because it does not run on PRs.
 
-Only `log-analytics-workspace` broadens its provider constraint to `>= 4.0, < 6.0`.
-Local mocked tests and the retention mutation pass with both 4.81.0 and 5.11.0.
-This permits the runner to use 5.x while existing stack consumers still select
-4.x through their other constraints. Other modules and the stack are not migrated
-to 5.x, and their 4.x provider dependency still needs separate security review.
-These checks do not prove live Azure compatibility across either major version
-or test every version allowed by the constraint.
+The remaining seven modules and stack now require AzureRM 5.x. The workspace
+retains its already tested >= 4.0, < 6.0 constraint; the shared runtime pins 5.11.0.
+The subnet's removed service_endpoints argument is replaced by dynamic
+service_endpoint blocks, preserving the supplied service names. Assertions cover
+a populated and an empty endpoint list. All 11 existing native test runs passed
+locally with 5.11.0. This does not establish compatibility with every allowed
+provider version or with a live Azure deployment. Provider 5.x also changes
+registration defaults; a real deployment migration requires reviewing the
+[upstream upgrade guide](https://registry.terraform.io/providers/hashicorp/azurerm/5.0.0/docs/guides/5.0-upgrade-guide).
+
+check_modules.py copies bounded top-level Terraform sources into an isolated
+snapshot and validates every module and stack without planning or executing data
+source programs. Only approved, checksum-pinned providers are available offline.
+Per-module lockfiles include exactly the declared providers. All eight modules
+and the stack passed local validation. CI saves module-validation.json alongside
+the existing test verification report.
+
+Adding the official external 2.4.2 package for function-app exposed 5 HIGH and
+1 CRITICAL findings in its embedded Go dependencies. The current image scan
+therefore fails its unchanged gate; no suppressions are added. The runtime is not
+ready for approval until this dependency issue is resolved. Validating a module
+does not run its external program; future plan tests must mock that data source.
 
 ## Execution and trust boundaries
 

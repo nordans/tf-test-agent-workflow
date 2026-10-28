@@ -40,6 +40,8 @@ uv sync --locked
 uv run --locked ruff check .
 uv run --locked ruff format --check .
 uv run --locked python -B -m pytest
+uv run --locked python -B -m test_agent.build_runtime
+uv run --locked python -B -m test_agent.check_modules
 ```
 
 These same checks run on pull requests. To apply formatting locally, run
@@ -50,6 +52,10 @@ dependency. See [SOLUTION.md](SOLUTION.md) for agent and Docker commands.
 PRs also run workflow validation, secret and dependency scans, and a vulnerability
 scan of the Terraform runner image. See [CI security checks](SOLUTION.md#ci-security-checks)
 for the exact gates, reports and current provider findings.
+
+The module compatibility check runs offline init and validation for all modules
+and stacks against the pinned provider schemas in Docker. It does not run plans,
+execute external data-source programs, or prove live Azure compatibility.
 
 ## Layout
 

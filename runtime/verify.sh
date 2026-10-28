@@ -2,7 +2,7 @@
 # Fixed commands only. /input is read-only; /work is an ephemeral tmpfs.
 set -eu
 cp /input/*.tf /work/
-cp /opt/provider/.terraform.lock.hcl /work/.terraform.lock.hcl
+cp /opt/provider/azurerm.lock.hcl /work/.terraform.lock.hcl
 mkdir /work/tests
 cp /input/generated.tftest.hcl /work/tests/generated.tftest.hcl
 

@@ -3,5 +3,7 @@
 !runtime/Dockerfile
 !runtime/providers.tf
 !runtime/azurerm.lock.hcl
+!runtime/external.lock.hcl
 !runtime/terraform.rc
 !runtime/verify.sh
+!runtime/check-module.sh

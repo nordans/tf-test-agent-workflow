@@ -13,7 +13,13 @@ resource "azurerm_subnet" "this" {
   resource_group_name  = var.resource_group_name
   virtual_network_name = azurerm_virtual_network.this.name
   address_prefixes     = each.value.address_prefixes
-  service_endpoints    = each.value.service_endpoints
+
+  dynamic "service_endpoint" {
+    for_each = each.value.service_endpoints
+    content {
+      service = service_endpoint.value
+    }
+  }
 }
 
 resource "azurerm_network_security_group" "this" {

@@ -1,6 +1,6 @@
 provider_installation {
   filesystem_mirror {
     path    = "/opt/provider-mirror"
-    include = ["registry.terraform.io/hashicorp/azurerm"]
+    include = ["registry.terraform.io/hashicorp/azurerm", "registry.terraform.io/hashicorp/external"]
   }
 }
