@@ -1,0 +1,1525 @@
+{
+  "example_pr": "https://github.com/nordans/tf-test-agent-workflow/pull/24",
+  "state": "Closed without merge after the completed review/rerun demonstration. Superseded as the open source-only example by PR26.",
+  "source_change": "New private AKS module without tests; existing retention default30to60 with the old assertion unchanged.",
+  "phases": {
+    "generation": {
+      "workflow": "https://github.com/nordans/tf-test-agent-workflow/actions/runs/40847785251",
+      "deterministic_ci": "https://github.com/nordans/tf-test-agent-workflow/actions/runs/40847785003",
+      "trusted_controller_commit": "aa7bf93eba63d041ecd91458e26e4fe215af8c72",
+      "controller_evidence": "All four workers' checkout logs use this main commit, not the PR head.",
+      "identity": {
+        "repository": "nordans/tf-test-agent-workflow",
+        "number": 24,
+        "base_sha": "aa7bf93eba63d041ecd91458e26e4fe215af8c72",
+        "head_sha": "1e97690da50340b21422f4d995fcc3e800da777a",
+        "origin": "github"
+      },
+      "merge_base": "aa7bf93eba63d041ecd91458e26e4fe215af8c72",
+      "status": "needs_review",
+      "patches": {
+        "proposal.patch": {
+          "bytes": 486,
+          "sha256": "55ea1f8a3d36d8898547a2ee444bbd93001d54f76ade181d461dda1889d0bf93"
+        },
+        "unverified.patch": {
+          "bytes": 4436,
+          "sha256": "89190c2328ce16885d599a6dea7e3606dd37ef60e2be45e25490f38bbd084c1b"
+        }
+      },
+      "comment_id": 6492759584,
+      "comment_url": "https://github.com/nordans/tf-test-agent-workflow/pull/24#issuecomment-6492759584",
+      "published_comment": "<!-- tf-test-agent-report -->\n\n### Terraform test agent\n\nResult: **needs_review**\n\nSource: head 1e97690da50340b21422f4d995fcc3e800da777a, base aa7bf93eba63d041ecd91458e26e4fe215af8c72, merge base aa7bf93eba63d041ecd91458e26e4fe215af8c72.\n\n| Module | Verified result |\n|---|---|\n| aks | needs_review |\n| log-analytics-workspace | verified |\n\n#### aks\n\nAnalysis skill: terraform-change-analysis.\n\nPlanner decision: **add_tests**\n\nPlan native Terraform tests for the new aks module, covering default behaviors, variable validations \\(name/dns\\_prefix whitespace, node\\_count boundaries and integers\\), security properties \\(private cluster, RBAC, disabled local accounts\\), and outputs wiring.\n\nAuthoring skill: terraform-unit-testing.\n\nPlanned cases: test\\_defaults, test\\_validation\\_blank\\_strings, test\\_validation\\_node\\_count, test\\_security\\_configuration, test\\_outputs.\n\n- warning: The new module aks lacks any native .tftest.hcl test files. (after:modules/aks/main.tf:1)\n\nThe candidate test suite did not pass. Review the native diagnostics.\n\nAuthor policy rejections: 1. Bounded diagnostics are retained in draft.json.\n\nCandidate tests: did not pass.\n\nSource mutation detected: False.\n\nVerifier diagnostic: Invalid operation: Block type \"default\\_node\\_pool\" is represented by a list of objects, so it must be indexed using a numeric key, like .default\\_node\\_pool\\[0\\].\n\nVerifier diagnostic: Invalid operation: Block type \"default\\_node\\_pool\" is represented by a list of objects, so it must be indexed using a numeric key, like .default\\_node\\_pool\\[0\\].\n\n#### log-analytics-workspace\n\nAnalysis skill: terraform-change-analysis.\n\nPlanner decision: **update_tests**\n\nThe default value of retention\\_in\\_days was updated from 30 to 60. The existing test suite needs an update to reflect this new default expectation in default\\_configuration.\n\nAuthoring skill: terraform-unit-testing.\n\nPlanned cases: update\\_default\\_retention\\_assertion.\n\n- warning: The default value of retention\\_in\\_days was changed from 30 to 60 in variables.tf, but the existing test in generated.tftest.hcl still asserts the old default value of 30. (after:modules/log-analytics-workspace/variables.tf:19, after:modules/log-analytics-workspace/tests/generated.tftest.hcl:25)\n\nBefore-source tests: passed.\n\nExisting head tests: did not pass.\n\nCandidate tests: passed.\n\nSource mutation detected: True.\n\nThe pr-result artifact contains a patch for verified modules. Review and apply it to this same PR. Infrastructure was not modified.\n\nUnverified test proposal: pr-result/unverified.patch contains the last bounded author draft rejected by policy or independent verification. It is separate from proposal.patch. The draft may contain invalid HCL; inspect and correct it before applying. It is not an approved test patch.\n\n[Run and artifacts](https://github.com/nordans/tf-test-agent-workflow/actions/runs/40847785251)\n\nMocked plans do not prove live Azure behavior. A detected mutation is not a coverage metric. Findings and proposed changes require human review.",
+      "modules": [
+        {
+          "module": "aks",
+          "model": "gemini-3.5-flash-lite",
+          "plan": {
+            "decision": "add_tests",
+            "summary": "Plan native Terraform tests for the new aks module, covering default behaviors, variable validations (name/dns_prefix whitespace, node_count boundaries and integers), security properties (private cluster, RBAC, disabled local accounts), and outputs wiring.",
+            "test_cases": [
+              {
+                "name": "test_defaults",
+                "category": "default",
+                "basis": "implemented_behavior",
+                "purpose": "Verify default values for node count and virtual machine size are correctly applied.",
+                "expected": "Default node_count is 2 and default vm_size is Standard_D2s_v5.",
+                "evidence": [
+                  {
+                    "revision": "after",
+                    "file": "modules/aks/variables.tf",
+                    "line": 36
+                  },
+                  {
+                    "revision": "after",
+                    "file": "modules/aks/variables.tf",
+                    "line": 47
+                  }
+                ]
+              },
+              {
+                "name": "test_validation_blank_strings",
+                "category": "validation",
+                "basis": "implemented_behavior",
+                "purpose": "Verify validation rules reject blank cluster names and DNS prefixes.",
+                "expected": "Validation fails when name or dns_prefix is empty or whitespace-only.",
+                "evidence": [
+                  {
+                    "revision": "after",
+                    "file": "modules/aks/variables.tf",
+                    "line": 5
+                  },
+                  {
+                    "revision": "after",
+                    "file": "modules/aks/variables.tf",
+                    "line": 25
+                  }
+                ]
+              },
+              {
+                "name": "test_validation_node_count",
+                "category": "validation",
+                "basis": "implemented_behavior",
+                "purpose": "Verify validation rules correctly constrain node_count boundaries and integer type.",
+                "expected": "Validation fails when node_count is less than 1, greater than 5, or non-integer.",
+                "evidence": [
+                  {
+                    "revision": "after",
+                    "file": "modules/aks/variables.tf",
+                    "line": 41
+                  }
+                ]
+              },
+              {
+                "name": "test_security_configuration",
+                "category": "security",
+                "basis": "implemented_behavior",
+                "purpose": "Verify security hardening defaults and Azure RBAC configurations are correctly set.",
+                "expected": "Cluster is configured with private_cluster_enabled = true, local_account_disabled = true, role_based_access_control_enabled = true, and Azure RBAC enabled.",
+                "evidence": [
+                  {
+                    "revision": "after",
+                    "file": "modules/aks/main.tf",
+                    "line": 7
+                  },
+                  {
+                    "revision": "after",
+                    "file": "modules/aks/main.tf",
+                    "line": 9
+                  },
+                  {
+                    "revision": "after",
+                    "file": "modules/aks/main.tf",
+                    "line": 10
+                  },
+                  {
+                    "revision": "after",
+                    "file": "modules/aks/main.tf",
+                    "line": 27
+                  }
+                ]
+              },
+              {
+                "name": "test_outputs",
+                "category": "output",
+                "basis": "implemented_behavior",
+                "purpose": "Verify all declared module outputs are correctly wired to underlying resource attributes.",
+                "expected": "Outputs id, private_fqdn, and principal_id correctly reference the azurerm_kubernetes_cluster resource attributes.",
+                "evidence": [
+                  {
+                    "revision": "after",
+                    "file": "modules/aks/outputs.tf",
+                    "line": 1
+                  },
+                  {
+                    "revision": "after",
+                    "file": "modules/aks/outputs.tf",
+                    "line": 6
+                  },
+                  {
+                    "revision": "after",
+                    "file": "modules/aks/outputs.tf",
+                    "line": 11
+                  }
+                ]
+              }
+            ],
+            "findings": [
+              {
+                "severity": "warning",
+                "description": "The new module aks lacks any native .tftest.hcl test files.",
+                "evidence": [
+                  {
+                    "revision": "after",
+                    "file": "modules/aks/main.tf",
+                    "line": 1
+                  }
+                ]
+              }
+            ],
+            "limitations": [
+              "Native tests are planned using mocked providers via command = plan and cannot verify Azure provider integration or runtime cluster connectivity."
+            ]
+          },
+          "analysis_tools": [
+            "load_skill",
+            "read_module",
+            "submit_test_plan"
+          ],
+          "author_tools": [
+            "load_skill",
+            "propose_test_files",
+            "propose_test_files",
+            "submit_proposal"
+          ],
+          "policy_hashes": {
+            "instructions_sha256": "e0108c979b142a739a1ee214ebc2a35469b2cec57abadfa3535d81a8f1e9c537",
+            "skill_sha256": "1423ab23f3505e2e468e7109ce86dcf37059fee96eee075414558a79976611bb"
+          },
+          "author_rejections": [
+            "HCL policy rejected proposal: NESTED_MOCK_DEFAULTS_MUST_BE_OBJECT: azurerm_kubernetes_cluster.identity; supply one object for all block instances, not a list."
+          ],
+          "usage": {
+            "promptTokenCount": 41163,
+            "candidatesTokenCount": 3841,
+            "totalTokenCount": 47643,
+            "thoughtsTokenCount": 2639
+          },
+          "author_status": "proposed",
+          "verification_status": "needs_review",
+          "reason": "The candidate test suite did not pass. Review the native diagnostics.",
+          "baseline": null,
+          "existing": null,
+          "candidate": {
+            "image_id": "sha256:5cd5076fb79237972dc98a5e698916c1cc62859410f29b5d325d4b92654c25ab",
+            "terraform": {
+              "passed": false,
+              "stage": "test",
+              "runs": [
+                {
+                  "file": "tests/generated.tftest.hcl",
+                  "name": "test_defaults",
+                  "status": "error"
+                },
+                {
+                  "file": "tests/generated.tftest.hcl",
+                  "name": "test_security_configuration",
+                  "status": "skip"
+                },
+                {
+                  "file": "tests/generated.tftest.hcl",
+                  "name": "test_outputs",
+                  "status": "skip"
+                },
+                {
+                  "file": "tests/generated.tftest.hcl",
+                  "name": "test_validation_name_empty",
+                  "status": "skip"
+                },
+                {
+                  "file": "tests/generated.tftest.hcl",
+                  "name": "test_validation_name_whitespace",
+                  "status": "skip"
+                },
+                {
+                  "file": "tests/generated.tftest.hcl",
+                  "name": "test_validation_dns_prefix_empty",
+                  "status": "skip"
+                },
+                {
+                  "file": "tests/generated.tftest.hcl",
+                  "name": "test_validation_dns_prefix_whitespace",
+                  "status": "skip"
+                },
+                {
+                  "file": "tests/generated.tftest.hcl",
+                  "name": "test_validation_node_count_zero",
+                  "status": "skip"
+                },
+                {
+                  "file": "tests/generated.tftest.hcl",
+                  "name": "test_validation_node_count_six",
+                  "status": "skip"
+                },
+                {
+                  "file": "tests/generated.tftest.hcl",
+                  "name": "test_validation_node_count_fraction",
+                  "status": "skip"
+                },
+                {
+                  "file": "tests/generated.tftest.hcl",
+                  "name": "test_validation_node_count_min_valid",
+                  "status": "skip"
+                },
+                {
+                  "file": "tests/generated.tftest.hcl",
+                  "name": "test_validation_node_count_max_valid",
+                  "status": "skip"
+                }
+              ],
+              "summary": {
+                "status": "error",
+                "passed": 0,
+                "failed": 0,
+                "errored": 1,
+                "skipped": 11
+              },
+              "assertion_failure": false,
+              "diagnostics": [
+                {
+                  "summary": "Invalid operation",
+                  "detail": "Block type \"default_node_pool\" is represented by a list of objects, so it must be indexed using a numeric key, like .default_node_pool[0]."
+                },
+                {
+                  "summary": "Invalid operation",
+                  "detail": "Block type \"default_node_pool\" is represented by a list of objects, so it must be indexed using a numeric key, like .default_node_pool[0]."
+                }
+              ]
+            },
+            "mutation": {
+              "executed": false,
+              "detected": false,
+              "attempts": []
+            },
+            "passed": false,
+            "suite_sha256": "82592d57a0cc8efd9c9772b5cdf7abe3836d3ea678a2c5b657b499f38348232f"
+          },
+          "verified_test_sha256": {
+            "tests/generated.tftest.hcl": "0ed3a7824de15001c7d83cb7b6e91f8287369bb959c6ebfe05701e3cdcc9a2d1"
+          }
+        },
+        {
+          "module": "log-analytics-workspace",
+          "model": "gemini-3.5-flash-lite",
+          "plan": {
+            "decision": "update_tests",
+            "summary": "The default value of retention_in_days was updated from 30 to 60. The existing test suite needs an update to reflect this new default expectation in default_configuration.",
+            "test_cases": [
+              {
+                "name": "update_default_retention_assertion",
+                "category": "default",
+                "basis": "implemented_behavior",
+                "purpose": "Update the default retention_in_days assertion to match the new default of 60 in variables.tf.",
+                "expected": "azurerm_log_analytics_workspace.this.retention_in_days equals 60 by default",
+                "evidence": [
+                  {
+                    "revision": "after",
+                    "file": "modules/log-analytics-workspace/variables.tf",
+                    "line": 19
+                  },
+                  {
+                    "revision": "after",
+                    "file": "modules/log-analytics-workspace/tests/generated.tftest.hcl",
+                    "line": 25
+                  }
+                ]
+              }
+            ],
+            "findings": [
+              {
+                "severity": "warning",
+                "description": "The default value of retention_in_days was changed from 30 to 60 in variables.tf, but the existing test in generated.tftest.hcl still asserts the old default value of 30.",
+                "evidence": [
+                  {
+                    "revision": "after",
+                    "file": "modules/log-analytics-workspace/variables.tf",
+                    "line": 19
+                  },
+                  {
+                    "revision": "after",
+                    "file": "modules/log-analytics-workspace/tests/generated.tftest.hcl",
+                    "line": 25
+                  }
+                ]
+              }
+            ],
+            "limitations": [
+              "The module contains no input validations; therefore, negative or out-of-range retention values are not rejected at the Terraform plan phase."
+            ]
+          },
+          "analysis_tools": [
+            "load_skill",
+            "read_module",
+            "submit_test_plan"
+          ],
+          "author_tools": [
+            "load_skill",
+            "propose_test_files",
+            "submit_proposal"
+          ],
+          "policy_hashes": {
+            "instructions_sha256": "e0108c979b142a739a1ee214ebc2a35469b2cec57abadfa3535d81a8f1e9c537",
+            "skill_sha256": "1423ab23f3505e2e468e7109ce86dcf37059fee96eee075414558a79976611bb"
+          },
+          "author_rejections": [],
+          "usage": {
+            "promptTokenCount": 22324,
+            "candidatesTokenCount": 1028,
+            "totalTokenCount": 23352,
+            "thoughtsTokenCount": 0
+          },
+          "author_status": "proposed",
+          "verification_status": "verified",
+          "reason": "",
+          "baseline": {
+            "passed": true,
+            "stage": "test",
+            "runs": [
+              {
+                "file": "tests/generated.tftest.hcl",
+                "name": "default_configuration",
+                "status": "pass"
+              },
+              {
+                "file": "tests/generated.tftest.hcl",
+                "name": "custom_override",
+                "status": "pass"
+              },
+              {
+                "file": "tests/generated.tftest.hcl",
+                "name": "outputs",
+                "status": "pass"
+              }
+            ],
+            "summary": {
+              "status": "pass",
+              "passed": 3,
+              "failed": 0,
+              "errored": 0,
+              "skipped": 0
+            },
+            "assertion_failure": false,
+            "diagnostics": []
+          },
+          "existing": {
+            "passed": false,
+            "stage": "test",
+            "runs": [
+              {
+                "file": "tests/generated.tftest.hcl",
+                "name": "default_configuration",
+                "status": "fail"
+              },
+              {
+                "file": "tests/generated.tftest.hcl",
+                "name": "custom_override",
+                "status": "pass"
+              },
+              {
+                "file": "tests/generated.tftest.hcl",
+                "name": "outputs",
+                "status": "pass"
+              }
+            ],
+            "summary": {
+              "status": "fail",
+              "passed": 2,
+              "failed": 1,
+              "errored": 0,
+              "skipped": 0
+            },
+            "assertion_failure": true,
+            "diagnostics": [
+              {
+                "summary": "Test assertion failed",
+                "detail": "Expected default retention_in_days to be 30."
+              }
+            ]
+          },
+          "candidate": {
+            "image_id": "sha256:5cd5076fb79237972dc98a5e698916c1cc62859410f29b5d325d4b92654c25ab",
+            "terraform": {
+              "passed": true,
+              "stage": "test",
+              "runs": [
+                {
+                  "file": "tests/generated.tftest.hcl",
+                  "name": "default_configuration",
+                  "status": "pass"
+                },
+                {
+                  "file": "tests/generated.tftest.hcl",
+                  "name": "custom_override",
+                  "status": "pass"
+                },
+                {
+                  "file": "tests/generated.tftest.hcl",
+                  "name": "outputs",
+                  "status": "pass"
+                }
+              ],
+              "summary": {
+                "status": "pass",
+                "passed": 3,
+                "failed": 0,
+                "errored": 0,
+                "skipped": 0
+              },
+              "assertion_failure": false,
+              "diagnostics": []
+            },
+            "mutation": {
+              "executed": true,
+              "detected": true,
+              "attempts": [
+                {
+                  "path": "modules/log-analytics-workspace/main.tf",
+                  "description": "Freeze retention_in_days wiring from var.retention_in_days to a known literal input.",
+                  "detected": true,
+                  "terraform": {
+                    "passed": false,
+                    "stage": "test",
+                    "runs": [
+                      {
+                        "file": "tests/generated.tftest.hcl",
+                        "name": "default_configuration",
+                        "status": "pass"
+                      },
+                      {
+                        "file": "tests/generated.tftest.hcl",
+                        "name": "custom_override",
+                        "status": "fail"
+                      },
+                      {
+                        "file": "tests/generated.tftest.hcl",
+                        "name": "outputs",
+                        "status": "pass"
+                      }
+                    ],
+                    "summary": {
+                      "status": "fail",
+                      "passed": 2,
+                      "failed": 1,
+                      "errored": 0,
+                      "skipped": 0
+                    },
+                    "assertion_failure": true,
+                    "diagnostics": [
+                      {
+                        "summary": "Test assertion failed",
+                        "detail": "Expected custom retention_in_days to be 90."
+                      }
+                    ]
+                  }
+                }
+              ]
+            },
+            "passed": true,
+            "suite_sha256": "a60585d5755c093cc4875b151cf31789d49c7a69bf3b6a72fbe9b48280c95942"
+          },
+          "verified_test_sha256": {
+            "tests/generated.tftest.hcl": "e0877fd0a48e4fda0a8931902bd0751622315260e55b228887a7c77d3e3f5d1a"
+          }
+        }
+      ],
+      "saved_patch_files": {
+        "proposal.patch": "docs/examples/retention-initial-verified.patch",
+        "unverified.patch": "docs/examples/aks-initial-unverified.patch"
+      }
+    },
+    "after_operator_review": {
+      "workflow": "https://github.com/nordans/tf-test-agent-workflow/actions/runs/40849967881",
+      "deterministic_ci": "https://github.com/nordans/tf-test-agent-workflow/actions/runs/40849972758",
+      "trusted_controller_commit": "aa7bf93eba63d041ecd91458e26e4fe215af8c72",
+      "controller_evidence": "All four workers' checkout logs use this main commit, not the PR head.",
+      "identity": {
+        "repository": "nordans/tf-test-agent-workflow",
+        "number": 24,
+        "base_sha": "aa7bf93eba63d041ecd91458e26e4fe215af8c72",
+        "head_sha": "1d56d617030c673636fb744e804e909df0475f49",
+        "origin": "github"
+      },
+      "merge_base": "aa7bf93eba63d041ecd91458e26e4fe215af8c72",
+      "status": "no_change_verified",
+      "patches": {
+        "proposal.patch": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "unverified.patch": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "comment_id": 6492759584,
+      "comment_url": "https://github.com/nordans/tf-test-agent-workflow/pull/24#issuecomment-6492759584",
+      "published_comment": "<!-- tf-test-agent-report -->\n\n### Terraform test agent\n\nResult: **no_change_verified**\n\nSource: head 1d56d617030c673636fb744e804e909df0475f49, base aa7bf93eba63d041ecd91458e26e4fe215af8c72, merge base aa7bf93eba63d041ecd91458e26e4fe215af8c72.\n\n| Module | Verified result |\n|---|---|\n| aks | no_change_verified |\n| log-analytics-workspace | no_change_verified |\n\n#### aks\n\nAnalysis skill: terraform-change-analysis.\n\nPlanner decision: **no_change**\n\nComprehensive native test files \\(behavior.tftest.hcl and generated.tftest.hcl\\) already exist for the aks module, providing full coverage of its inputs, defaults, validations, security attributes, and outputs. Therefore, no additional test changes are required.\n\n- info: The module aks is already thoroughly tested by behavior.tftest.hcl and generated.tftest.hcl, which cover input variable validations, security defaults, resource wiring, and output mappings. (after:modules/aks/tests/behavior.tftest.hcl:1, after:modules/aks/tests/generated.tftest.hcl:1)\n\nExisting head tests: passed.\n\nCandidate tests: passed.\n\nSource mutation detected: True.\n\nNo test changes are needed. Existing tests passed independent execution and a source-mutation control.\n\n#### log-analytics-workspace\n\nAnalysis skill: terraform-change-analysis.\n\nPlanner decision: **no_change**\n\nThe module log-analytics-workspace has been updated so that default retention\\_in\\_days is 60 instead of 30. The existing test file generated.tftest.hcl has been correctly updated by the PR author to reflect this new default, alongside custom override tests and output verification. Therefore, no further test changes are required.\n\n- info: The PR updates the default value of retention\\_in\\_days from 30 to 60 in variables.tf and correctly updates the corresponding test assertion in generated.tftest.hcl. (after:modules/log-analytics-workspace/variables.tf:19, after:modules/log-analytics-workspace/tests/generated.tftest.hcl:25)\n\nBefore-source tests: passed.\n\nExisting head tests: passed.\n\nCandidate tests: passed.\n\nSource mutation detected: True.\n\nNo test changes are needed. Existing tests passed independent execution and a source-mutation control.\n\n[Run and artifacts](https://github.com/nordans/tf-test-agent-workflow/actions/runs/40849967881)\n\nMocked plans do not prove live Azure behavior. A detected mutation is not a coverage metric. Findings and proposed changes require human review.",
+      "modules": [
+        {
+          "module": "aks",
+          "model": "gemini-3.5-flash-lite",
+          "plan": {
+            "decision": "no_change",
+            "summary": "Comprehensive native test files (behavior.tftest.hcl and generated.tftest.hcl) already exist for the aks module, providing full coverage of its inputs, defaults, validations, security attributes, and outputs. Therefore, no additional test changes are required.",
+            "test_cases": [],
+            "findings": [
+              {
+                "severity": "info",
+                "description": "The module aks is already thoroughly tested by behavior.tftest.hcl and generated.tftest.hcl, which cover input variable validations, security defaults, resource wiring, and output mappings.",
+                "evidence": [
+                  {
+                    "revision": "after",
+                    "file": "modules/aks/tests/behavior.tftest.hcl",
+                    "line": 1
+                  },
+                  {
+                    "revision": "after",
+                    "file": "modules/aks/tests/generated.tftest.hcl",
+                    "line": 1
+                  }
+                ]
+              }
+            ],
+            "limitations": [
+              "Test execution relies on mock providers and does not verify live Azure API behavior or deployment success."
+            ]
+          },
+          "analysis_tools": [
+            "load_skill",
+            "read_module",
+            "submit_test_plan"
+          ],
+          "author_tools": [],
+          "policy_hashes": {},
+          "author_rejections": [],
+          "usage": {
+            "promptTokenCount": 12264,
+            "candidatesTokenCount": 245,
+            "totalTokenCount": 12509
+          },
+          "author_status": "no_change",
+          "verification_status": "no_change_verified",
+          "reason": "",
+          "baseline": null,
+          "existing": {
+            "passed": true,
+            "stage": "test",
+            "runs": [
+              {
+                "file": "tests/behavior.tftest.hcl",
+                "name": "caller_input_wiring",
+                "status": "pass"
+              },
+              {
+                "file": "tests/behavior.tftest.hcl",
+                "name": "default_tags_and_fixed_settings",
+                "status": "pass"
+              },
+              {
+                "file": "tests/generated.tftest.hcl",
+                "name": "test_defaults",
+                "status": "pass"
+              },
+              {
+                "file": "tests/generated.tftest.hcl",
+                "name": "test_security_configuration",
+                "status": "pass"
+              },
+              {
+                "file": "tests/generated.tftest.hcl",
+                "name": "test_outputs",
+                "status": "pass"
+              },
+              {
+                "file": "tests/generated.tftest.hcl",
+                "name": "test_validation_name_empty",
+                "status": "pass"
+              },
+              {
+                "file": "tests/generated.tftest.hcl",
+                "name": "test_validation_name_whitespace",
+                "status": "pass"
+              },
+              {
+                "file": "tests/generated.tftest.hcl",
+                "name": "test_validation_dns_prefix_empty",
+                "status": "pass"
+              },
+              {
+                "file": "tests/generated.tftest.hcl",
+                "name": "test_validation_dns_prefix_whitespace",
+                "status": "pass"
+              },
+              {
+                "file": "tests/generated.tftest.hcl",
+                "name": "test_validation_node_count_zero",
+                "status": "pass"
+              },
+              {
+                "file": "tests/generated.tftest.hcl",
+                "name": "test_validation_node_count_six",
+                "status": "pass"
+              },
+              {
+                "file": "tests/generated.tftest.hcl",
+                "name": "test_validation_node_count_fraction",
+                "status": "pass"
+              },
+              {
+                "file": "tests/generated.tftest.hcl",
+                "name": "test_validation_node_count_min_valid",
+                "status": "pass"
+              },
+              {
+                "file": "tests/generated.tftest.hcl",
+                "name": "test_validation_node_count_max_valid",
+                "status": "pass"
+              }
+            ],
+            "summary": {
+              "status": "pass",
+              "passed": 14,
+              "failed": 0,
+              "errored": 0,
+              "skipped": 0
+            },
+            "assertion_failure": false,
+            "diagnostics": []
+          },
+          "candidate": {
+            "image_id": "sha256:21f29e217dbae65dfddd9ada7180d33924febca6760a05777b6d63ddd9339a3a",
+            "terraform": {
+              "passed": true,
+              "stage": "test",
+              "runs": [
+                {
+                  "file": "tests/behavior.tftest.hcl",
+                  "name": "caller_input_wiring",
+                  "status": "pass"
+                },
+                {
+                  "file": "tests/behavior.tftest.hcl",
+                  "name": "default_tags_and_fixed_settings",
+                  "status": "pass"
+                },
+                {
+                  "file": "tests/generated.tftest.hcl",
+                  "name": "test_defaults",
+                  "status": "pass"
+                },
+                {
+                  "file": "tests/generated.tftest.hcl",
+                  "name": "test_security_configuration",
+                  "status": "pass"
+                },
+                {
+                  "file": "tests/generated.tftest.hcl",
+                  "name": "test_outputs",
+                  "status": "pass"
+                },
+                {
+                  "file": "tests/generated.tftest.hcl",
+                  "name": "test_validation_name_empty",
+                  "status": "pass"
+                },
+                {
+                  "file": "tests/generated.tftest.hcl",
+                  "name": "test_validation_name_whitespace",
+                  "status": "pass"
+                },
+                {
+                  "file": "tests/generated.tftest.hcl",
+                  "name": "test_validation_dns_prefix_empty",
+                  "status": "pass"
+                },
+                {
+                  "file": "tests/generated.tftest.hcl",
+                  "name": "test_validation_dns_prefix_whitespace",
+                  "status": "pass"
+                },
+                {
+                  "file": "tests/generated.tftest.hcl",
+                  "name": "test_validation_node_count_zero",
+                  "status": "pass"
+                },
+                {
+                  "file": "tests/generated.tftest.hcl",
+                  "name": "test_validation_node_count_six",
+                  "status": "pass"
+                },
+                {
+                  "file": "tests/generated.tftest.hcl",
+                  "name": "test_validation_node_count_fraction",
+                  "status": "pass"
+                },
+                {
+                  "file": "tests/generated.tftest.hcl",
+                  "name": "test_validation_node_count_min_valid",
+                  "status": "pass"
+                },
+                {
+                  "file": "tests/generated.tftest.hcl",
+                  "name": "test_validation_node_count_max_valid",
+                  "status": "pass"
+                }
+              ],
+              "summary": {
+                "status": "pass",
+                "passed": 14,
+                "failed": 0,
+                "errored": 0,
+                "skipped": 0
+              },
+              "assertion_failure": false,
+              "diagnostics": []
+            },
+            "mutation": {
+              "executed": true,
+              "detected": true,
+              "attempts": [
+                {
+                  "path": "modules/aks/main.tf",
+                  "description": "Freeze name wiring from var.name to a known literal input.",
+                  "detected": true,
+                  "terraform": {
+                    "passed": false,
+                    "stage": "test",
+                    "runs": [
+                      {
+                        "file": "tests/behavior.tftest.hcl",
+                        "name": "caller_input_wiring",
+                        "status": "pass"
+                      },
+                      {
+                        "file": "tests/behavior.tftest.hcl",
+                        "name": "default_tags_and_fixed_settings",
+                        "status": "fail"
+                      },
+                      {
+                        "file": "tests/generated.tftest.hcl",
+                        "name": "test_defaults",
+                        "status": "pass"
+                      },
+                      {
+                        "file": "tests/generated.tftest.hcl",
+                        "name": "test_security_configuration",
+                        "status": "pass"
+                      },
+                      {
+                        "file": "tests/generated.tftest.hcl",
+                        "name": "test_outputs",
+                        "status": "pass"
+                      },
+                      {
+                        "file": "tests/generated.tftest.hcl",
+                        "name": "test_validation_name_empty",
+                        "status": "pass"
+                      },
+                      {
+                        "file": "tests/generated.tftest.hcl",
+                        "name": "test_validation_name_whitespace",
+                        "status": "pass"
+                      },
+                      {
+                        "file": "tests/generated.tftest.hcl",
+                        "name": "test_validation_dns_prefix_empty",
+                        "status": "pass"
+                      },
+                      {
+                        "file": "tests/generated.tftest.hcl",
+                        "name": "test_validation_dns_prefix_whitespace",
+                        "status": "pass"
+                      },
+                      {
+                        "file": "tests/generated.tftest.hcl",
+                        "name": "test_validation_node_count_zero",
+                        "status": "pass"
+                      },
+                      {
+                        "file": "tests/generated.tftest.hcl",
+                        "name": "test_validation_node_count_six",
+                        "status": "pass"
+                      },
+                      {
+                        "file": "tests/generated.tftest.hcl",
+                        "name": "test_validation_node_count_fraction",
+                        "status": "pass"
+                      },
+                      {
+                        "file": "tests/generated.tftest.hcl",
+                        "name": "test_validation_node_count_min_valid",
+                        "status": "pass"
+                      },
+                      {
+                        "file": "tests/generated.tftest.hcl",
+                        "name": "test_validation_node_count_max_valid",
+                        "status": "pass"
+                      }
+                    ],
+                    "summary": {
+                      "status": "fail",
+                      "passed": 13,
+                      "failed": 1,
+                      "errored": 0,
+                      "skipped": 0
+                    },
+                    "assertion_failure": true,
+                    "diagnostics": [
+                      {
+                        "summary": "Test assertion failed",
+                        "detail": "The default scenario must also forward its distinct name."
+                      }
+                    ]
+                  }
+                }
+              ]
+            },
+            "passed": true,
+            "suite_sha256": "a379cad13933079d7f4eba40af250f184afecce76a0059f72a7385c1050f36c8"
+          },
+          "verified_test_sha256": {
+            "tests/behavior.tftest.hcl": "41a3d87dd5a893c64e452c571aac0fb9370c3075e31dc7d87087b825ace43aac",
+            "tests/generated.tftest.hcl": "ea1bc49f076096af855d5b4aa84732c21bebdaf4bc0fbe06767d5da7d675fda3"
+          }
+        },
+        {
+          "module": "log-analytics-workspace",
+          "model": "gemini-3.5-flash-lite",
+          "plan": {
+            "decision": "no_change",
+            "summary": "The module log-analytics-workspace has been updated so that default retention_in_days is 60 instead of 30. The existing test file generated.tftest.hcl has been correctly updated by the PR author to reflect this new default, alongside custom override tests and output verification. Therefore, no further test changes are required.",
+            "test_cases": [],
+            "findings": [
+              {
+                "severity": "info",
+                "description": "The PR updates the default value of retention_in_days from 30 to 60 in variables.tf and correctly updates the corresponding test assertion in generated.tftest.hcl.",
+                "evidence": [
+                  {
+                    "revision": "after",
+                    "file": "modules/log-analytics-workspace/variables.tf",
+                    "line": 19
+                  },
+                  {
+                    "revision": "after",
+                    "file": "modules/log-analytics-workspace/tests/generated.tftest.hcl",
+                    "line": 25
+                  }
+                ]
+              }
+            ],
+            "limitations": [
+              "Mocked provider plan does not validate live Azure API behavior or retention limits enforced by the provider service."
+            ]
+          },
+          "analysis_tools": [
+            "load_skill",
+            "read_module",
+            "submit_test_plan"
+          ],
+          "author_tools": [],
+          "policy_hashes": {},
+          "author_rejections": [],
+          "usage": {
+            "promptTokenCount": 5787,
+            "candidatesTokenCount": 271,
+            "totalTokenCount": 6058
+          },
+          "author_status": "no_change",
+          "verification_status": "no_change_verified",
+          "reason": "",
+          "baseline": {
+            "passed": true,
+            "stage": "test",
+            "runs": [
+              {
+                "file": "tests/generated.tftest.hcl",
+                "name": "default_configuration",
+                "status": "pass"
+              },
+              {
+                "file": "tests/generated.tftest.hcl",
+                "name": "custom_override",
+                "status": "pass"
+              },
+              {
+                "file": "tests/generated.tftest.hcl",
+                "name": "outputs",
+                "status": "pass"
+              }
+            ],
+            "summary": {
+              "status": "pass",
+              "passed": 3,
+              "failed": 0,
+              "errored": 0,
+              "skipped": 0
+            },
+            "assertion_failure": false,
+            "diagnostics": []
+          },
+          "existing": {
+            "passed": true,
+            "stage": "test",
+            "runs": [
+              {
+                "file": "tests/generated.tftest.hcl",
+                "name": "default_configuration",
+                "status": "pass"
+              },
+              {
+                "file": "tests/generated.tftest.hcl",
+                "name": "custom_override",
+                "status": "pass"
+              },
+              {
+                "file": "tests/generated.tftest.hcl",
+                "name": "outputs",
+                "status": "pass"
+              }
+            ],
+            "summary": {
+              "status": "pass",
+              "passed": 3,
+              "failed": 0,
+              "errored": 0,
+              "skipped": 0
+            },
+            "assertion_failure": false,
+            "diagnostics": []
+          },
+          "candidate": {
+            "image_id": "sha256:21f29e217dbae65dfddd9ada7180d33924febca6760a05777b6d63ddd9339a3a",
+            "terraform": {
+              "passed": true,
+              "stage": "test",
+              "runs": [
+                {
+                  "file": "tests/generated.tftest.hcl",
+                  "name": "default_configuration",
+                  "status": "pass"
+                },
+                {
+                  "file": "tests/generated.tftest.hcl",
+                  "name": "custom_override",
+                  "status": "pass"
+                },
+                {
+                  "file": "tests/generated.tftest.hcl",
+                  "name": "outputs",
+                  "status": "pass"
+                }
+              ],
+              "summary": {
+                "status": "pass",
+                "passed": 3,
+                "failed": 0,
+                "errored": 0,
+                "skipped": 0
+              },
+              "assertion_failure": false,
+              "diagnostics": []
+            },
+            "mutation": {
+              "executed": true,
+              "detected": true,
+              "attempts": [
+                {
+                  "path": "modules/log-analytics-workspace/main.tf",
+                  "description": "Freeze retention_in_days wiring from var.retention_in_days to a known literal input.",
+                  "detected": true,
+                  "terraform": {
+                    "passed": false,
+                    "stage": "test",
+                    "runs": [
+                      {
+                        "file": "tests/generated.tftest.hcl",
+                        "name": "default_configuration",
+                        "status": "pass"
+                      },
+                      {
+                        "file": "tests/generated.tftest.hcl",
+                        "name": "custom_override",
+                        "status": "fail"
+                      },
+                      {
+                        "file": "tests/generated.tftest.hcl",
+                        "name": "outputs",
+                        "status": "pass"
+                      }
+                    ],
+                    "summary": {
+                      "status": "fail",
+                      "passed": 2,
+                      "failed": 1,
+                      "errored": 0,
+                      "skipped": 0
+                    },
+                    "assertion_failure": true,
+                    "diagnostics": [
+                      {
+                        "summary": "Test assertion failed",
+                        "detail": "Expected custom retention_in_days to be 90."
+                      }
+                    ]
+                  }
+                }
+              ]
+            },
+            "passed": true,
+            "suite_sha256": "a60585d5755c093cc4875b151cf31789d49c7a69bf3b6a72fbe9b48280c95942"
+          },
+          "verified_test_sha256": {
+            "tests/generated.tftest.hcl": "e0877fd0a48e4fda0a8931902bd0751622315260e55b228887a7c77d3e3f5d1a"
+          }
+        }
+      ]
+    }
+  },
+  "operator_review": {
+    "applied_commit": "de05669fefcad6831c6c16711128d0036bf0edad",
+    "review_commit": "1d56d617030c673636fb744e804e909df0475f49",
+    "details": {
+      "source_head": "1e97690da50340b21422f4d995fcc3e800da777a",
+      "operator_changes": "Six list-index corrections in the twelve-run agent AKS draft; two separate reviewer scenarios for caller wiring/default tags and fixed settings. Verified retention patch applied as-is.",
+      "index_review": {
+        "original_sha256": "925c5d33ad941cfea1dae32ab006bef18cb4abd0b3f3ff70bb1fed658657858f",
+        "fixed_sha256_before_fmt": "da23ad694a905b911a6e80571e00ce4a424e774b8f09e5ed4826daa1ea233ee1",
+        "replacements": {
+          "azurerm_kubernetes_cluster.this.default_node_pool.": 5,
+          "azurerm_kubernetes_cluster.this.azure_active_directory_role_based_access_control.": 1
+        },
+        "source_unchanged": true
+      },
+      "checks": [
+        {
+          "module": "aks",
+          "checks": {
+            "image_id": "sha256:62471846105048c6f0094f664438d36fd0d01d349543ac6bcd2b4b9ea2e07fb9",
+            "terraform": {
+              "passed": true,
+              "stage": "test",
+              "runs": [
+                {
+                  "file": "tests/behavior.tftest.hcl",
+                  "name": "caller_input_wiring",
+                  "status": "pass"
+                },
+                {
+                  "file": "tests/behavior.tftest.hcl",
+                  "name": "default_tags_and_fixed_settings",
+                  "status": "pass"
+                },
+                {
+                  "file": "tests/generated.tftest.hcl",
+                  "name": "test_defaults",
+                  "status": "pass"
+                },
+                {
+                  "file": "tests/generated.tftest.hcl",
+                  "name": "test_security_configuration",
+                  "status": "pass"
+                },
+                {
+                  "file": "tests/generated.tftest.hcl",
+                  "name": "test_outputs",
+                  "status": "pass"
+                },
+                {
+                  "file": "tests/generated.tftest.hcl",
+                  "name": "test_validation_name_empty",
+                  "status": "pass"
+                },
+                {
+                  "file": "tests/generated.tftest.hcl",
+                  "name": "test_validation_name_whitespace",
+                  "status": "pass"
+                },
+                {
+                  "file": "tests/generated.tftest.hcl",
+                  "name": "test_validation_dns_prefix_empty",
+                  "status": "pass"
+                },
+                {
+                  "file": "tests/generated.tftest.hcl",
+                  "name": "test_validation_dns_prefix_whitespace",
+                  "status": "pass"
+                },
+                {
+                  "file": "tests/generated.tftest.hcl",
+                  "name": "test_validation_node_count_zero",
+                  "status": "pass"
+                },
+                {
+                  "file": "tests/generated.tftest.hcl",
+                  "name": "test_validation_node_count_six",
+                  "status": "pass"
+                },
+                {
+                  "file": "tests/generated.tftest.hcl",
+                  "name": "test_validation_node_count_fraction",
+                  "status": "pass"
+                },
+                {
+                  "file": "tests/generated.tftest.hcl",
+                  "name": "test_validation_node_count_min_valid",
+                  "status": "pass"
+                },
+                {
+                  "file": "tests/generated.tftest.hcl",
+                  "name": "test_validation_node_count_max_valid",
+                  "status": "pass"
+                }
+              ],
+              "summary": {
+                "status": "pass",
+                "passed": 14,
+                "failed": 0,
+                "errored": 0,
+                "skipped": 0
+              },
+              "assertion_failure": false,
+              "diagnostics": []
+            },
+            "mutation": {
+              "executed": true,
+              "detected": true,
+              "attempts": [
+                {
+                  "path": "modules/aks/main.tf",
+                  "description": "Freeze name wiring from var.name to a known literal input.",
+                  "detected": true,
+                  "terraform": {
+                    "passed": false,
+                    "stage": "test",
+                    "runs": [
+                      {
+                        "file": "tests/behavior.tftest.hcl",
+                        "name": "caller_input_wiring",
+                        "status": "pass"
+                      },
+                      {
+                        "file": "tests/behavior.tftest.hcl",
+                        "name": "default_tags_and_fixed_settings",
+                        "status": "fail"
+                      },
+                      {
+                        "file": "tests/generated.tftest.hcl",
+                        "name": "test_defaults",
+                        "status": "pass"
+                      },
+                      {
+                        "file": "tests/generated.tftest.hcl",
+                        "name": "test_security_configuration",
+                        "status": "pass"
+                      },
+                      {
+                        "file": "tests/generated.tftest.hcl",
+                        "name": "test_outputs",
+                        "status": "pass"
+                      },
+                      {
+                        "file": "tests/generated.tftest.hcl",
+                        "name": "test_validation_name_empty",
+                        "status": "pass"
+                      },
+                      {
+                        "file": "tests/generated.tftest.hcl",
+                        "name": "test_validation_name_whitespace",
+                        "status": "pass"
+                      },
+                      {
+                        "file": "tests/generated.tftest.hcl",
+                        "name": "test_validation_dns_prefix_empty",
+                        "status": "pass"
+                      },
+                      {
+                        "file": "tests/generated.tftest.hcl",
+                        "name": "test_validation_dns_prefix_whitespace",
+                        "status": "pass"
+                      },
+                      {
+                        "file": "tests/generated.tftest.hcl",
+                        "name": "test_validation_node_count_zero",
+                        "status": "pass"
+                      },
+                      {
+                        "file": "tests/generated.tftest.hcl",
+                        "name": "test_validation_node_count_six",
+                        "status": "pass"
+                      },
+                      {
+                        "file": "tests/generated.tftest.hcl",
+                        "name": "test_validation_node_count_fraction",
+                        "status": "pass"
+                      },
+                      {
+                        "file": "tests/generated.tftest.hcl",
+                        "name": "test_validation_node_count_min_valid",
+                        "status": "pass"
+                      },
+                      {
+                        "file": "tests/generated.tftest.hcl",
+                        "name": "test_validation_node_count_max_valid",
+                        "status": "pass"
+                      }
+                    ],
+                    "summary": {
+                      "status": "fail",
+                      "passed": 13,
+                      "failed": 1,
+                      "errored": 0,
+                      "skipped": 0
+                    },
+                    "assertion_failure": true,
+                    "diagnostics": [
+                      {
+                        "summary": "Test assertion failed",
+                        "detail": "The default scenario must also forward its distinct name."
+                      }
+                    ]
+                  }
+                }
+              ]
+            },
+            "passed": true,
+            "suite_sha256": "a2c575f41061c66aaceb352945a97273eddcc583decd9cc065b8e62e832fa447"
+          }
+        },
+        {
+          "module": "log-analytics-workspace",
+          "checks": {
+            "image_id": "sha256:62471846105048c6f0094f664438d36fd0d01d349543ac6bcd2b4b9ea2e07fb9",
+            "terraform": {
+              "passed": true,
+              "stage": "test",
+              "runs": [
+                {
+                  "file": "tests/generated.tftest.hcl",
+                  "name": "default_configuration",
+                  "status": "pass"
+                },
+                {
+                  "file": "tests/generated.tftest.hcl",
+                  "name": "custom_override",
+                  "status": "pass"
+                },
+                {
+                  "file": "tests/generated.tftest.hcl",
+                  "name": "outputs",
+                  "status": "pass"
+                }
+              ],
+              "summary": {
+                "status": "pass",
+                "passed": 3,
+                "failed": 0,
+                "errored": 0,
+                "skipped": 0
+              },
+              "assertion_failure": false,
+              "diagnostics": []
+            },
+            "mutation": {
+              "executed": true,
+              "detected": true,
+              "attempts": [
+                {
+                  "path": "modules/log-analytics-workspace/main.tf",
+                  "description": "Freeze retention_in_days wiring from var.retention_in_days to a known literal input.",
+                  "detected": true,
+                  "terraform": {
+                    "passed": false,
+                    "stage": "test",
+                    "runs": [
+                      {
+                        "file": "tests/generated.tftest.hcl",
+                        "name": "default_configuration",
+                        "status": "pass"
+                      },
+                      {
+                        "file": "tests/generated.tftest.hcl",
+                        "name": "custom_override",
+                        "status": "fail"
+                      },
+                      {
+                        "file": "tests/generated.tftest.hcl",
+                        "name": "outputs",
+                        "status": "pass"
+                      }
+                    ],
+                    "summary": {
+                      "status": "fail",
+                      "passed": 2,
+                      "failed": 1,
+                      "errored": 0,
+                      "skipped": 0
+                    },
+                    "assertion_failure": true,
+                    "diagnostics": [
+                      {
+                        "summary": "Test assertion failed",
+                        "detail": "Expected custom retention_in_days to be 90."
+                      }
+                    ]
+                  }
+                }
+              ]
+            },
+            "passed": true,
+            "suite_sha256": "a60585d5755c093cc4875b151cf31789d49c7a69bf3b6a72fbe9b48280c95942"
+          }
+        }
+      ],
+      "test_sha256": {
+        "modules/aks/tests/behavior.tftest.hcl": "41a3d87dd5a893c64e452c571aac0fb9370c3075e31dc7d87087b825ace43aac",
+        "modules/aks/tests/generated.tftest.hcl": "e251e82593405710cde5c07b14167934da7dc389c0f526b28a5beea61ee3a36a",
+        "modules/log-analytics-workspace/tests/generated.tftest.hcl": "e0877fd0a48e4fda0a8931902bd0751622315260e55b228887a7c77d3e3f5d1a"
+      }
+    },
+    "committed_test_sha256": {
+      "modules/aks/tests/behavior.tftest.hcl": "41a3d87dd5a893c64e452c571aac0fb9370c3075e31dc7d87087b825ace43aac",
+      "modules/aks/tests/generated.tftest.hcl": "ea1bc49f076096af855d5b4aa84732c21bebdaf4bc0fbe06767d5da7d675fda3",
+      "modules/log-analytics-workspace/tests/generated.tftest.hcl": "e0877fd0a48e4fda0a8931902bd0751622315260e55b228887a7c77d3e3f5d1a"
+    },
+    "line_endings_normalized_on_commit": [
+      "modules/aks/tests/generated.tftest.hcl"
+    ],
+    "credit": "The model authored twelve AKS scenarios and the retention update. An operator corrected six list indices, kept the original assertions/inputs, and added two separate reviewer scenarios. The initial failure is retained, not presented as one-shot autonomous success.",
+    "source_unchanged_after_initial_change": true
+  },
+  "targeted_security_regression": {
+    "scope": "Temporary local source copy, using the final PR24 tests. No repository infrastructure was changed.",
+    "source_head": "1d56d617030c673636fb744e804e909df0475f49",
+    "change": "Disable private_cluster_enabled without weakening its assertion",
+    "terraform": {
+      "passed": false,
+      "stage": "test",
+      "runs": [
+        {
+          "file": "tests/behavior.tftest.hcl",
+          "name": "caller_input_wiring",
+          "status": "pass"
+        },
+        {
+          "file": "tests/behavior.tftest.hcl",
+          "name": "default_tags_and_fixed_settings",
+          "status": "pass"
+        },
+        {
+          "file": "tests/generated.tftest.hcl",
+          "name": "test_defaults",
+          "status": "pass"
+        },
+        {
+          "file": "tests/generated.tftest.hcl",
+          "name": "test_security_configuration",
+          "status": "fail"
+        },
+        {
+          "file": "tests/generated.tftest.hcl",
+          "name": "test_outputs",
+          "status": "pass"
+        },
+        {
+          "file": "tests/generated.tftest.hcl",
+          "name": "test_validation_name_empty",
+          "status": "pass"
+        },
+        {
+          "file": "tests/generated.tftest.hcl",
+          "name": "test_validation_name_whitespace",
+          "status": "pass"
+        },
+        {
+          "file": "tests/generated.tftest.hcl",
+          "name": "test_validation_dns_prefix_empty",
+          "status": "pass"
+        },
+        {
+          "file": "tests/generated.tftest.hcl",
+          "name": "test_validation_dns_prefix_whitespace",
+          "status": "pass"
+        },
+        {
+          "file": "tests/generated.tftest.hcl",
+          "name": "test_validation_node_count_zero",
+          "status": "pass"
+        },
+        {
+          "file": "tests/generated.tftest.hcl",
+          "name": "test_validation_node_count_six",
+          "status": "pass"
+        },
+        {
+          "file": "tests/generated.tftest.hcl",
+          "name": "test_validation_node_count_fraction",
+          "status": "pass"
+        },
+        {
+          "file": "tests/generated.tftest.hcl",
+          "name": "test_validation_node_count_min_valid",
+          "status": "pass"
+        },
+        {
+          "file": "tests/generated.tftest.hcl",
+          "name": "test_validation_node_count_max_valid",
+          "status": "pass"
+        }
+      ],
+      "summary": {
+        "status": "fail",
+        "passed": 13,
+        "failed": 1,
+        "errored": 0,
+        "skipped": 0
+      },
+      "assertion_failure": true,
+      "diagnostics": [
+        {
+          "summary": "Test assertion failed",
+          "detail": "Private cluster must be enabled."
+        }
+      ]
+    }
+  },
+  "final_repository_tests": {
+    "passed": true,
+    "modules": 9,
+    "native_scenarios": 40,
+    "all_suites_detected_sampled_mutation": true,
+    "untested_modules": []
+  },
+  "runtime_image_findings": [
+    {
+      "target": "bin/terraform",
+      "id": "GO-2026-5932",
+      "package": "golang.org/x/crypto",
+      "installed": "v0.58.0",
+      "fixed": null,
+      "severity": "UNKNOWN"
+    },
+    {
+      "target": "opt/provider-mirror/registry.terraform.io/hashicorp/azurerm/5.11.0/linux_amd64/terraform-provider-azurerm_v5.11.0_x5",
+      "id": "GO-2026-5932",
+      "package": "golang.org/x/crypto",
+      "installed": "v0.57.0",
+      "fixed": null,
+      "severity": "UNKNOWN"
+    },
+    {
+      "target": "opt/provider-mirror/registry.terraform.io/hashicorp/azurerm/5.11.0/linux_amd64/terraform-provider-azurerm_v5.11.0_x5",
+      "id": "CVE-2026-78661",
+      "package": "golang.org/x/net",
+      "installed": "v0.60.0",
+      "fixed": "0.62.0",
+      "severity": "UNKNOWN"
+    },
+    {
+      "target": "opt/provider-mirror/registry.terraform.io/hashicorp/azurerm/5.11.0/linux_amd64/terraform-provider-azurerm_v5.11.0_x5",
+      "id": "CVE-2026-97045",
+      "package": "golang.org/x/net",
+      "installed": "v0.60.0",
+      "fixed": "0.62.0",
+      "severity": "UNKNOWN"
+    }
+  ],
+  "limitations": [
+    "Mocked plans do not establish Azure deployment, availability, live connectivity or effective permissions.",
+    "Source-derived guards cover a declared subset; neither them nor one sampled mutation prove complete semantic coverage.",
+    "The model's wording about full coverage is a planner opinion, not an endorsed measurement.",
+    "Artifacts expire after seven days; this record retains structured results, digests, comments and commit/run links.",
+    "Operator correction and review were required; rejected author drafts remain bounded data, not executable or approved patches."
+  ],
+  "state_at_recording": "Open and intentionally unmerged. AKS and retention 60 stay outside main.",
+  "superseded_by": "https://github.com/nordans/tf-test-agent-workflow/pull/26"
+}
