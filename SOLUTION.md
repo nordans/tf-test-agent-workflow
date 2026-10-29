@@ -127,35 +127,36 @@ proposal.patch contains only independently verified module changes. Mutation
 reports distinguish surviving controls from setup/runtime errors. Attribute paths
 retain nested block names when prioritizing the bounded three-control sample.
 
-[Example PR #20](https://github.com/nordans/tf-test-agent-workflow/pull/20) is kept open.
-It adds a previously unseen Foundry module and changes retention 30 to 60, without
-merging that infrastructure into main. [Permanent evidence](docs/examples/final-pr.json)
-records actual SHAs, decisions, skills, findings, patches and native results.
+[Example PR #24](https://github.com/nordans/tf-test-agent-workflow/pull/24) remains
+open and unmerged. It adds a previously unseen private AKS module and changes
+retention 30 to 60 with the old test left intact. [Permanent evidence](docs/examples/final-pr.json)
+retains actual identities, skills/tools, rejections, native results and patch hashes.
 
-1. [Initial generation](https://github.com/nordans/tf-test-agent-workflow/actions/runs/40794141055): the new module had no tests and
-   the retention assertion was stale. Both modules received verified proposals.
-   The Foundry suite had five scenarios; retention had three. Terraform CI correctly
-   failed before the patch was applied.
-2. [Reviewed application](https://github.com/nordans/tf-test-agent-workflow/actions/runs/40794895190): the exact GitHub patch was applied
-   in the same PR. Two reviewer tag tests were added separately. Both modules became
-   no_change_verified with an empty patch; all nine module suites passed 33 scenarios.
-   The retention planner still chose update_tests, but its author returned identical
-   content; verification normalized the actual result without hiding the raw plan.
-3. [Negative control](https://github.com/nordans/tf-test-agent-workflow/actions/runs/40796174464): public access was temporarily enabled
-   while the false assertion remained. The model incorrectly chose no_change for
-   Foundry. Independent execution returned needs_review and published the assertion
-   failure and contradiction; no weakening patch was emitted. CI was also red.
-4. [Restored configuration](https://github.com/nordans/tf-test-agent-workflow/actions/runs/40796847735): public access was restored to false
-   in a normal commit. Both modules again became no_change_verified with no patch.
-   [Final Terraform CI](https://github.com/nordans/tf-test-agent-workflow/actions/runs/40796850799) passed all 33 scenarios and all
-   nine sampled-mutation controls. The example remains open and unmerged.
+1. [Generation](https://github.com/nordans/tf-test-agent-workflow/actions/runs/40847785251):
+   the agent authored twelve AKS scenarios and a retention update. Structural
+   feedback corrected an invalid nested mock. Independent execution then rejected
+   AKS because resource-block list accesses lacked indices. Retention was verified:
+   proposal.patch contained its update; unverified.patch contained the AKS draft.
+   The bot published the actual failure in the originating PR. Initial CI also
+   correctly failed for the missing/stale checked-in tests.
+2. Operator review: commit de05669 applied the exact verified retention patch and
+   corrected six list indices in the agent's AKS draft. Its assertions and inputs
+   were retained. Commit 1d56d61 added two separate reviewer scenarios for caller
+   wiring, empty tags and fixed settings. This participation is recorded explicitly;
+   the result is not claimed as one-shot autonomous success.
+3. [After review](https://github.com/nordans/tf-test-agent-workflow/actions/runs/40849967881):
+   both modules became no_change_verified and both patch artifacts were empty.
+   [Terraform CI](https://github.com/nordans/tf-test-agent-workflow/actions/runs/40849972758)
+   passed 40 scenarios across nine modules and all nine sampled-mutation controls.
+   A separate temporary private-API regression now fails a real assertion; the
+   older six-test draft had allowed that same regression.
 
-The first generated Foundry suite missed caller override of its owned tag. A
-targeted reverse-merge regression passed those tests. Two explicit reviewer tests
-now reject it. This demonstrates why verified execution is not semantic completeness.
-Earlier [bootstrap](docs/examples/four-module-bootstrap.json) and
-[network](docs/examples/network-coverage.json) records also retain unsuccessful
-attempts and limitations instead of claiming one-shot autonomous coverage.
+Historical [Foundry](docs/examples/foundry-experiment.json),
+[AKS audit](docs/examples/aks-quality-audit.json),
+[bootstrap](docs/examples/four-module-bootstrap.json) and
+[network](docs/examples/network-coverage.json) records retain unsuccessful attempts
+and reviewer contributions. Experimental PR #20 was closed without merging its
+infrastructure. The final example contains no Foundry changes.
 
 Main has eight suites and 26 scenarios; all detect a sampled mutation. Required
 checks are Code quality CI, Workflow validation, Secret scan, Dependency audit and

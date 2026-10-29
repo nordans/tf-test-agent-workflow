@@ -5,9 +5,9 @@ Azure modules in a GitHub pull request. It uses reusable analysis/authoring skil
 approved provider schemas and isolated execution. Results and a test-only patch
 are published to the originating PR for review.
 
-[Example PR](https://github.com/nordans/tf-test-agent-workflow/pull/20) shows a new
-Foundry module and an existing retention change, from missing/stale tests through
-generation, execution and verification. Its infrastructure changes remain outside
+[Example PR](https://github.com/nordans/tf-test-agent-workflow/pull/24) shows a new
+AKS module and an existing retention change, including a failed author draft,
+reviewed corrections and independent execution. Its infrastructure changes remain outside
 main. [Saved evidence](docs/examples/final-pr.json) remains available after Actions
 artifacts expire.
 
