@@ -22,8 +22,8 @@ run "default_configuration" {
   }
 
   assert {
-    condition     = azurerm_log_analytics_workspace.this.retention_in_days == 30
-    error_message = "Expected default retention_in_days to be 30."
+    condition     = azurerm_log_analytics_workspace.this.retention_in_days == 60
+    error_message = "Expected default retention_in_days to be 60."
   }
 
   assert {
