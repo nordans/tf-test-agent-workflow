@@ -7,7 +7,7 @@ resource "azurerm_cognitive_account" "this" {
   sku_name              = "S0"
 
   project_management_enabled    = true
-  public_network_access_enabled = true
+  public_network_access_enabled = false
   local_auth_enabled            = false
 
   identity {
