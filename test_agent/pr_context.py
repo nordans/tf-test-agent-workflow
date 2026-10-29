@@ -34,6 +34,7 @@ SOURCE_PATH = re.compile(
 SCRIPT_PATH = re.compile(
     r"modules/[a-z][a-z0-9-]{0,63}/scripts/[A-Za-z0-9_][A-Za-z0-9_.-]*\.(?:sh|py|ps1)"
 )
+LOCK_PATH = re.compile(r"modules/[a-z][a-z0-9-]{0,63}/\.terraform\.lock\.hcl")
 
 
 class PRIdentity(StrictModel):
@@ -211,7 +212,11 @@ def classify(changes):
                     continue
                 modules.add(parts[1])
                 if (
-                    not (SOURCE_PATH.fullmatch(path) or SCRIPT_PATH.fullmatch(path))
+                    not (
+                        SOURCE_PATH.fullmatch(path)
+                        or SCRIPT_PATH.fullmatch(path)
+                        or LOCK_PATH.fullmatch(path)
+                    )
                     or change.status == "T"
                 ):
                     reasons.add("Unsupported module file or file-type change.")
@@ -269,7 +274,11 @@ class GitRepository:
             path = raw_path.decode("utf-8")
             if path.endswith(".md"):
                 continue
-            if not (SOURCE_PATH.fullmatch(path) or SCRIPT_PATH.fullmatch(path)):
+            if not (
+                SOURCE_PATH.fullmatch(path)
+                or SCRIPT_PATH.fullmatch(path)
+                or LOCK_PATH.fullmatch(path)
+            ):
                 raise AgentError("Unsupported files exist inside the selected module.")
             mode, kind, oid = header.decode("ascii").split()
             if (
@@ -282,6 +291,10 @@ class GitRepository:
             size = int(self.run("cat-file", "-s", oid))
             if size > MAX_FILE_BYTES or len(files) >= MAX_FILES:
                 raise AgentError("The Git snapshot exceeds its input limits.")
+            if LOCK_PATH.fullmatch(path):
+                # Execution uses reviewed runtime locks, never PR-selected packages.
+                # Changed module locks are handled separately as review-only inputs.
+                continue
             files[path] = self.run("cat-file", "blob", oid).decode("utf-8")
         check_snapshot(files)
         return files
@@ -333,6 +346,16 @@ class GitRepository:
                     )
                     before.update(old)
                     after.update(new)
+                    if any(
+                        LOCK_PATH.fullmatch(path)
+                        and path.startswith(f"modules/{module}/")
+                        for change in changes
+                        for path in (change.path, change.previous_path)
+                        if path is not None
+                    ):
+                        raise AgentError(
+                            "Module provider lockfile changes require human review; tests use approved runtime locks."
+                        )
                     if not any(p.endswith(".tf") for p in new):
                         raise AgentError("Removed modules require human review.")
                     validate_sources(new)
