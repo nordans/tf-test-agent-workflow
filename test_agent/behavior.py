@@ -8,7 +8,10 @@ from dataclasses import dataclass
 
 import hcl2
 
+from test_agent.context import AgentError
 from test_agent.hcl import require
+from test_agent.terraform_policy import validate_output_coverage
+from test_agent.validation_cases import validate_validation_coverage
 
 
 @dataclass(frozen=True)
@@ -115,3 +118,18 @@ def validate_boolean_coverage(before, after, suite):
     require(
         not missing, "CONFIGURED_BOOLEAN_ASSERTIONS_MISSING: " + "; ".join(missing[:8])
     )
+
+
+def validate_required_coverage(before, after, suite, plan):
+    errors = []
+    for check in (
+        lambda: validate_output_coverage(before, after, suite, plan),
+        lambda: validate_boolean_coverage(before, after, suite),
+        lambda: validate_validation_coverage(before, after, suite),
+    ):
+        try:
+            check()
+        except AgentError as error:
+            errors.append(str(error)[:300])
+    if errors:
+        raise AgentError("\n".join(errors))

@@ -90,12 +90,30 @@ For trimspace/nonempty checks test both empty and whitespace strings. Include
 valid numeric boundaries in passing scenarios. Reconcile actual cases with the
 plan before submitting; runtime success alone does not establish that the plan
 was implemented.
+The caller also supplies required_validation_examples for recognized source
+rules. Implement every listed value: valid=false needs expect_failures for that
+variable; valid=true needs a passing run without expected failures. Reuse shared
+required inputs in top-level variables and override only changed values per run
+to keep the suite concise. Boolean, output and validation requirements all remain
+mandatory during correction; do not trade one category for another.
+
+expect_failures entries are unquoted references to variables that actually have
+validation blocks, not strings, expressions or validation-block addresses. Syntax
+example (adapt the variable and invalid input to the caller's source):
+
+~~~hcl
+run "reject_blank" {
+  command = plan
+  variables { name = "" }
+  expect_failures = [var.name]
+}
+~~~
 For empty maps use length(value) == 0 to avoid collection/object type differences.
 Use length checks for empty collections generally; dynamic and typed empty sets
 can compare differently. For nonempty collections, compare normalized values.
 Use expect_failures only for validations actually present in the module.
 
-The caller supplies limits. Use at most 12 assertions per run and 12 runs per file.
+The caller supplies limits. Use at most 12 assertions per run and 16 runs per file.
 If related checks exceed the per-run limit, split them into additional named runs
 with the same inputs. Retain planned output, security and wiring assertions during
 structural correction. Do not turn a broad proposal into a smaller one just to

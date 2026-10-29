@@ -10,7 +10,7 @@ import sys
 import tempfile
 from pathlib import Path
 
-from test_agent.behavior import validate_boolean_coverage
+from test_agent.behavior import validate_required_coverage
 from test_agent.context import AgentError
 from test_agent.gemini import GeminiClient
 from test_agent.github import MARKER, GitHub
@@ -32,7 +32,6 @@ from test_agent.sandbox import docker_environment
 from test_agent.suite_runner import SuiteRunner
 from test_agent.terraform_policy import (
     test_files,
-    validate_output_coverage,
     validate_update,
 )
 
@@ -104,10 +103,9 @@ def verify_one(bundle, item, runner):
         validate_update(
             before, after, existing, candidate, runner.schemas, previous_sources=after
         )
-        validate_output_coverage(
+        validate_required_coverage(
             before, after, suite, item.analysis.plan if item.analysis else None
         )
-        validate_boolean_coverage(before, after, suite)
         if previous:
             report.baseline, _ = runner.execute(before, previous)
             if not report.baseline["passed"]:
@@ -137,7 +135,7 @@ def verify_one(bundle, item, runner):
             report.status = "verified"
         report.reason = ""
     except AgentError as error:
-        report.status, report.reason = "needs_review", str(error)
+        report.status, report.reason = "needs_review", str(error)[:2000]
     return report
 
 
@@ -222,15 +220,16 @@ def unverified_patch(bundle, draft, report):
     """Keep failed proposals reviewable without granting verification status."""
     chunks = []
     for item, result in zip(draft.modules, report.modules, strict=True):
-        if item.status != "proposed" or (
+        edits = item.edits or item.rejected_edits
+        if not edits or (
             report.status != "failed"
             and result.status in ("verified", "no_change_verified")
         ):
             continue
         current = test_files(bundle.module_files(item.module, "after"), item.module)
-        if set(item.edits) - set(current) - {"tests/generated.tftest.hcl"}:
+        if set(edits) - set(current) - {"tests/generated.tftest.hcl"}:
             continue
-        for path, content in sorted(item.edits.items()):
+        for path, content in sorted(edits.items()):
             target = f"modules/{item.module}/{path}"
             for line in difflib.unified_diff(
                 current.get(path, "").splitlines(keepends=True),
@@ -303,6 +302,10 @@ def render_comment(bundle, draft, report, run_id=None):
                 lines.append("Additional findings are retained in the draft artifact.")
         if result.reason:
             lines.append(literal(result.reason[:1000]))
+        if item.rejection_reasons:
+            lines.append(
+                f"Author policy rejections: {len(item.rejection_reasons)}. Bounded diagnostics are retained in draft.json."
+            )
         for label, execution in (
             ("Before-source tests", result.baseline),
             ("Existing head tests", result.existing),
@@ -356,7 +359,7 @@ def render_comment(bundle, draft, report, run_id=None):
         )
     if unverified_patch(bundle, draft, report):
         lines.append(
-            "Unverified test proposal: pr-result/unverified.patch contains the author's draft for modules that did not pass verification. It is separate from proposal.patch. Inspect and correct it before applying; it is not an approved test patch."
+            "Unverified test proposal: pr-result/unverified.patch contains the last bounded author draft rejected by policy or independent verification. It is separate from proposal.patch. The draft may contain invalid HCL; inspect and correct it before applying. It is not an approved test patch."
         )
     if run_id is not None:
         if not re.fullmatch(r"[0-9]+", run_id):

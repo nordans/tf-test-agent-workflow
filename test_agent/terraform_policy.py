@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from test_agent.hcl import parse_hcl, require
 
 NAME = r"[A-Za-z_][A-Za-z0-9_-]{0,63}"
+MAX_RUNS = 16
 TEST_PATH = re.compile(r"tests/[A-Za-z0-9_][A-Za-z0-9_.-]{0,90}\.tftest\.hcl")
 PROVIDERS = {"azurerm", "external"}
 FUNCTIONS = frozenset(
@@ -284,7 +285,10 @@ def validate_suite(sources, tests, schemas):
             "INVALID_TEST_INPUTS",
         )
         runs = data.get("run", [])
-        require(1 <= len(runs) <= 12, "EXPECTED_TEST_RUNS")
+        require(
+            1 <= len(runs) <= MAX_RUNS,
+            f"EXPECTED_TEST_RUNS: each file needs 1..{MAX_RUNS} named runs; combine related checks or use another offered path when available",
+        )
         local_names = set()
         for run in runs:
             require(isinstance(run, dict) and len(run) == 1, "INVALID_RUN")
@@ -320,7 +324,15 @@ def validate_suite(sources, tests, schemas):
                 )
                 require(
                     match and source.variables.get(match[1], {}).get("validation"),
-                    "EXPECTED_FAILURE_MUST_REFERENCE_VALIDATION",
+                    "EXPECTED_FAILURE_MUST_REFERENCE_VALIDATION: use unquoted var.name references; allowed: "
+                    + (
+                        ", ".join(
+                            "var." + name
+                            for name, config in sorted(source.variables.items())
+                            if config.get("validation")
+                        )
+                        or "none"
+                    ),
                 )
             for assertion in assertions:
                 require(

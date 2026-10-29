@@ -129,6 +129,50 @@ run "invalid_name" {
     assert "Freeze pool.capacity" in controls[0][1]
 
 
+def test_expected_failure_diagnostic_explains_unquoted_references_and_valid_variables():
+    files = {
+        p: text.replace(
+            'variable "name" {\n  type = string\n}',
+            'variable "name" {\n type = string\n validation {\n condition = length(trimspace(var.name)) > 0\n error_message = "Name required"\n }\n}',
+        )
+        for p, text in AI_FILES.items()
+    }
+    hcl = (
+        AI_HCL
+        + """
+run "invalid_name" {
+  command = plan
+  variables { name = "" }
+  expect_failures = ["var.name"]
+}
+"""
+    )
+    with pytest.raises(
+        AgentError, match="use unquoted var.name references; allowed: var.name"
+    ):
+        validate_suite(files, {RELTEST: hcl}, ALL_SCHEMAS)
+
+
+@pytest.mark.parametrize("count,accepted", [(16, True), (17, False)])
+def test_run_budget_fits_boundary_examples_and_remains_bounded(count, accepted):
+    prefix = AI_HCL.split('run "defaults"')[0]
+    hcl = prefix + "\n".join(
+        f"""run "case_{index}" {{
+          command = plan
+          assert {{
+            condition = azurerm_search_service.this.public_network_access_enabled == false
+            error_message = "Public access disabled"
+          }}
+        }}"""
+        for index in range(count)
+    )
+    if accepted:
+        assert len(validate_suite(AI_FILES, {RELTEST: hcl}, ALL_SCHEMAS).runs) == count
+    else:
+        with pytest.raises(AgentError, match="1..16 named runs"):
+            validate_suite(AI_FILES, {RELTEST: hcl}, ALL_SCHEMAS)
+
+
 def test_boolean_inventory_requires_only_new_or_changed_properties():
     after = nested_files()
     required = required_booleans(AI_FILES, after)
@@ -195,6 +239,44 @@ def test_author_can_correct_missing_boolean_without_dropping_other_checks(reposi
     ]
     assert "CONFIGURED_BOOLEAN_ASSERTIONS_MISSING" in error["error"]
     assert "output.id" in result.modules[0].edits[RELTEST]
+    assert (
+        "CONFIGURED_BOOLEAN_ASSERTIONS_MISSING"
+        in result.modules[0].rejection_reasons[0]
+    )
+    assert not result.modules[0].rejected_edits
+
+
+def test_last_rejected_draft_is_reviewable_without_granting_execution(repository):
+    add_ai(repository)
+    bundle = collect(repository)
+    calls = author_calls(without_boolean())
+    client = FakeClient([calls[0], calls[1], calls[1], calls[2]])
+    with patch("test_agent.pr_author.run_planner", return_value=ai_plan()):
+        item = draft_tests(bundle, ROOT, client, ALL_SCHEMAS, SCHEMA_HASH)
+    module = item.modules[0]
+    assert module.status == "needs_review" and not module.edits
+    assert len(module.rejection_reasons) == 2
+    assert module.rejected_edits == {RELTEST: without_boolean()}
+    report = verify_tests(bundle, item, None)
+    assert not proposal_patch(bundle, report)
+    assert "modules/ai-search/tests/generated.tftest.hcl" in unverified_patch(
+        bundle, item, report
+    )
+    assert "may contain invalid HCL" in render_comment(bundle, item, report)
+
+
+def test_rejected_contents_cannot_be_labeled_as_an_approved_proposal():
+    with pytest.raises(ValueError, match="needs_review"):
+        ModuleDraft(
+            module="test",
+            status="proposed",
+            edits={RELTEST: AI_HCL},
+            rejected_edits={RELTEST: AI_HCL},
+        )
+    with pytest.raises(ValueError, match="artifact paths"):
+        ModuleDraft(
+            module="test", status="needs_review", rejected_edits={"../main.tf": AI_HCL}
+        )
 
 
 def test_verifier_rechecks_missing_booleans_before_any_execution(repository):
