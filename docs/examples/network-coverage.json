@@ -1,0 +1,551 @@
+{
+  "execution": "Local native Terraform verification in isolated containers; no model calls or GitHub workflow are claimed in this record.",
+  "source_revision": "6a32e241fc4b6d455fbd207175f8584acb7066c5",
+  "change": "Keep all three original network scenarios and add caller overrides, an additional subnet, the empty map and output/resource reference checks. Infrastructure, providers and controller policy are unchanged.",
+  "files": {
+    "modules/network/tests/behavior.tftest.hcl": {
+      "sha256": "feb42a912db7ac694bae255428d663af92b0bc0022b3dd357ccad3ded65e2116"
+    },
+    "modules/network/tests/empty-subnets.tftest.hcl": {
+      "sha256": "75ee3dd332963b0c02f31fcdc4e87b788e0580f7b7871ea53a6f01dd4e3a6b5c"
+    },
+    "modules/network/tests/main.tftest.hcl": {
+      "sha256": "f06e37395efebf5198c0a94a3530663c6dd58820fe7b7db7de8d1efae4a2e12a"
+    }
+  },
+  "before": {
+    "image_id": "sha256:62471846105048c6f0094f664438d36fd0d01d349543ac6bcd2b4b9ea2e07fb9",
+    "terraform": {
+      "passed": true,
+      "stage": "test",
+      "runs": [
+        {
+          "file": "tests/main.tftest.hcl",
+          "name": "creates_one_subnet_and_nsg_per_key",
+          "status": "pass"
+        },
+        {
+          "file": "tests/main.tftest.hcl",
+          "name": "names_follow_the_convention",
+          "status": "pass"
+        },
+        {
+          "file": "tests/main.tftest.hcl",
+          "name": "rejects_invalid_address_space",
+          "status": "pass"
+        }
+      ],
+      "summary": {
+        "status": "pass",
+        "passed": 3,
+        "failed": 0,
+        "errored": 0,
+        "skipped": 0
+      },
+      "assertion_failure": false,
+      "diagnostics": []
+    },
+    "mutation": {
+      "executed": true,
+      "detected": false,
+      "attempts": [
+        {
+          "path": "modules/network/main.tf",
+          "description": "Freeze for_each wiring from var.subnets to a known literal input.",
+          "detected": false,
+          "terraform": {
+            "passed": false,
+            "stage": "test",
+            "runs": [
+              {
+                "file": "tests/main.tftest.hcl",
+                "name": "creates_one_subnet_and_nsg_per_key",
+                "status": "error"
+              },
+              {
+                "file": "tests/main.tftest.hcl",
+                "name": "names_follow_the_convention",
+                "status": "skip"
+              },
+              {
+                "file": "tests/main.tftest.hcl",
+                "name": "rejects_invalid_address_space",
+                "status": "skip"
+              }
+            ],
+            "summary": {
+              "status": "error",
+              "passed": 0,
+              "failed": 0,
+              "errored": 1,
+              "skipped": 2
+            },
+            "assertion_failure": false,
+            "diagnostics": [
+              {
+                "summary": "Unsupported attribute",
+                "detail": "This object does not have an attribute named \"service_endpoints\"."
+              }
+            ]
+          }
+        },
+        {
+          "path": "modules/network/main.tf",
+          "description": "Freeze for_each wiring from var.subnets to a known literal input.",
+          "detected": false,
+          "terraform": {
+            "passed": true,
+            "stage": "test",
+            "runs": [
+              {
+                "file": "tests/main.tftest.hcl",
+                "name": "creates_one_subnet_and_nsg_per_key",
+                "status": "pass"
+              },
+              {
+                "file": "tests/main.tftest.hcl",
+                "name": "names_follow_the_convention",
+                "status": "pass"
+              },
+              {
+                "file": "tests/main.tftest.hcl",
+                "name": "rejects_invalid_address_space",
+                "status": "pass"
+              }
+            ],
+            "summary": {
+              "status": "pass",
+              "passed": 3,
+              "failed": 0,
+              "errored": 0,
+              "skipped": 0
+            },
+            "assertion_failure": false,
+            "diagnostics": []
+          }
+        },
+        {
+          "path": "modules/network/main.tf",
+          "description": "Freeze for_each wiring from var.subnets to a known literal input.",
+          "detected": false,
+          "terraform": {
+            "passed": true,
+            "stage": "test",
+            "runs": [
+              {
+                "file": "tests/main.tftest.hcl",
+                "name": "creates_one_subnet_and_nsg_per_key",
+                "status": "pass"
+              },
+              {
+                "file": "tests/main.tftest.hcl",
+                "name": "names_follow_the_convention",
+                "status": "pass"
+              },
+              {
+                "file": "tests/main.tftest.hcl",
+                "name": "rejects_invalid_address_space",
+                "status": "pass"
+              }
+            ],
+            "summary": {
+              "status": "pass",
+              "passed": 3,
+              "failed": 0,
+              "errored": 0,
+              "skipped": 0
+            },
+            "assertion_failure": false,
+            "diagnostics": []
+          }
+        }
+      ]
+    },
+    "passed": false,
+    "suite_sha256": "9c733f13d9cccd1ede69684bf408ef1111dc40cef3ee67ec5a6e81fe9895f7e7"
+  },
+  "after": {
+    "image_id": "sha256:62471846105048c6f0094f664438d36fd0d01d349543ac6bcd2b4b9ea2e07fb9",
+    "terraform": {
+      "passed": true,
+      "stage": "test",
+      "runs": [
+        {
+          "file": "tests/behavior.tftest.hcl",
+          "name": "caller_overrides_are_forwarded",
+          "status": "pass"
+        },
+        {
+          "file": "tests/behavior.tftest.hcl",
+          "name": "additional_subnet_gets_resources",
+          "status": "pass"
+        },
+        {
+          "file": "tests/behavior.tftest.hcl",
+          "name": "outputs_preserve_resource_ids",
+          "status": "pass"
+        },
+        {
+          "file": "tests/empty-subnets.tftest.hcl",
+          "name": "empty_subnets_create_no_subnet_resources",
+          "status": "pass"
+        },
+        {
+          "file": "tests/main.tftest.hcl",
+          "name": "creates_one_subnet_and_nsg_per_key",
+          "status": "pass"
+        },
+        {
+          "file": "tests/main.tftest.hcl",
+          "name": "names_follow_the_convention",
+          "status": "pass"
+        },
+        {
+          "file": "tests/main.tftest.hcl",
+          "name": "rejects_invalid_address_space",
+          "status": "pass"
+        }
+      ],
+      "summary": {
+        "status": "pass",
+        "passed": 7,
+        "failed": 0,
+        "errored": 0,
+        "skipped": 0
+      },
+      "assertion_failure": false,
+      "diagnostics": []
+    },
+    "mutation": {
+      "executed": true,
+      "detected": true,
+      "attempts": [
+        {
+          "path": "modules/network/main.tf",
+          "description": "Freeze resource_group_name wiring from var.resource_group_name to a known literal input.",
+          "detected": true,
+          "terraform": {
+            "passed": false,
+            "stage": "test",
+            "runs": [
+              {
+                "file": "tests/behavior.tftest.hcl",
+                "name": "caller_overrides_are_forwarded",
+                "status": "fail"
+              },
+              {
+                "file": "tests/behavior.tftest.hcl",
+                "name": "additional_subnet_gets_resources",
+                "status": "pass"
+              },
+              {
+                "file": "tests/behavior.tftest.hcl",
+                "name": "outputs_preserve_resource_ids",
+                "status": "pass"
+              },
+              {
+                "file": "tests/empty-subnets.tftest.hcl",
+                "name": "empty_subnets_create_no_subnet_resources",
+                "status": "pass"
+              },
+              {
+                "file": "tests/main.tftest.hcl",
+                "name": "creates_one_subnet_and_nsg_per_key",
+                "status": "pass"
+              },
+              {
+                "file": "tests/main.tftest.hcl",
+                "name": "names_follow_the_convention",
+                "status": "pass"
+              },
+              {
+                "file": "tests/main.tftest.hcl",
+                "name": "rejects_invalid_address_space",
+                "status": "pass"
+              }
+            ],
+            "summary": {
+              "status": "fail",
+              "passed": 6,
+              "failed": 1,
+              "errored": 0,
+              "skipped": 0
+            },
+            "assertion_failure": true,
+            "diagnostics": [
+              {
+                "summary": "Test assertion failed",
+                "detail": "The virtual network must use the caller resource group and location."
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "passed": true,
+    "suite_sha256": "f81f56ffe53a4b7bd831a7eb70d34575a32eebdaeb47a39cb03e202ce8f6d02f"
+  },
+  "controlled_regressions": [
+    {
+      "case": "ignore_caller_address_space",
+      "path": "modules/network/main.tf",
+      "block": "azurerm_virtual_network",
+      "attribute": "address_space",
+      "temporary_replacement": "[\"10.10.0.0/16\"]",
+      "old_suite": {
+        "passed": true,
+        "summary": {
+          "status": "pass",
+          "passed": 3,
+          "failed": 0,
+          "errored": 0,
+          "skipped": 0
+        }
+      },
+      "expanded_suite": {
+        "passed": false,
+        "summary": {
+          "status": "fail",
+          "passed": 5,
+          "failed": 2,
+          "errored": 0,
+          "skipped": 0
+        },
+        "assertion_failure": true,
+        "diagnostics": [
+          {
+            "summary": "Test assertion failed",
+            "detail": "Every caller address range must reach the virtual network."
+          },
+          {
+            "summary": "Test assertion failed",
+            "detail": "The virtual network must still be planned when no subnets are requested."
+          }
+        ]
+      }
+    },
+    {
+      "case": "discard_virtual_network_tags",
+      "path": "modules/network/main.tf",
+      "block": "azurerm_virtual_network",
+      "attribute": "tags",
+      "temporary_replacement": "{}",
+      "old_suite": {
+        "passed": true,
+        "summary": {
+          "status": "pass",
+          "passed": 3,
+          "failed": 0,
+          "errored": 0,
+          "skipped": 0
+        }
+      },
+      "expanded_suite": {
+        "passed": false,
+        "summary": {
+          "status": "fail",
+          "passed": 6,
+          "failed": 1,
+          "errored": 0,
+          "skipped": 0
+        },
+        "assertion_failure": true,
+        "diagnostics": [
+          {
+            "summary": "Test assertion failed",
+            "detail": "All caller tags must reach the virtual network."
+          }
+        ]
+      }
+    },
+    {
+      "case": "freeze_nsg_subnet_keys",
+      "path": "modules/network/main.tf",
+      "block": "azurerm_network_security_group",
+      "attribute": "for_each",
+      "temporary_replacement": "{\"apps\": {\"address_prefixes\": [\"10.10.0.0/24\"], \"service_endpoints\": [\"Microsoft.Storage\"]}, \"data\": {\"address_prefixes\": [\"10.10.1.0/24\"]}}",
+      "old_suite": {
+        "passed": true,
+        "summary": {
+          "status": "pass",
+          "passed": 3,
+          "failed": 0,
+          "errored": 0,
+          "skipped": 0
+        }
+      },
+      "expanded_suite": {
+        "passed": false,
+        "summary": {
+          "status": "error",
+          "passed": 3,
+          "failed": 1,
+          "errored": 1,
+          "skipped": 2
+        },
+        "assertion_failure": false,
+        "diagnostics": [
+          {
+            "summary": "Invalid index",
+            "detail": "The given key does not identify an element in this collection value."
+          },
+          {
+            "summary": "Invalid index",
+            "detail": "The given key does not identify an element in this collection value."
+          },
+          {
+            "summary": "Test assertion failed",
+            "detail": "An empty input map must create no network security groups."
+          }
+        ]
+      }
+    },
+    {
+      "case": "freeze_association_subnet_keys",
+      "path": "modules/network/main.tf",
+      "block": "azurerm_subnet_network_security_group_association",
+      "attribute": "for_each",
+      "temporary_replacement": "{\"apps\": {\"address_prefixes\": [\"10.10.0.0/24\"], \"service_endpoints\": [\"Microsoft.Storage\"]}, \"data\": {\"address_prefixes\": [\"10.10.1.0/24\"]}}",
+      "old_suite": {
+        "passed": true,
+        "summary": {
+          "status": "pass",
+          "passed": 3,
+          "failed": 0,
+          "errored": 0,
+          "skipped": 0
+        }
+      },
+      "expanded_suite": {
+        "passed": false,
+        "summary": {
+          "status": "error",
+          "passed": 3,
+          "failed": 0,
+          "errored": 2,
+          "skipped": 2
+        },
+        "assertion_failure": false,
+        "diagnostics": [
+          {
+            "summary": "Invalid index",
+            "detail": "The given key does not identify an element in this collection value."
+          },
+          {
+            "summary": "Invalid index",
+            "detail": "The given key does not identify an element in this collection value."
+          },
+          {
+            "summary": "Invalid index",
+            "detail": "The given key does not identify an element in this collection value."
+          },
+          {
+            "summary": "Invalid index",
+            "detail": "The given key does not identify an element in this collection value."
+          },
+          {
+            "summary": "Invalid index",
+            "detail": "The given key does not identify an element in this collection value."
+          },
+          {
+            "summary": "Invalid index",
+            "detail": "The given key does not identify an element in this collection value."
+          },
+          {
+            "summary": "Invalid index",
+            "detail": "The given key does not identify an element in this collection value."
+          },
+          {
+            "summary": "Invalid index",
+            "detail": "The given key does not identify an element in this collection value."
+          }
+        ]
+      }
+    },
+    {
+      "case": "bind_every_association_to_apps_nsg",
+      "path": "modules/network/main.tf",
+      "block": "azurerm_subnet_network_security_group_association",
+      "attribute": "network_security_group_id",
+      "temporary_replacement": "azurerm_network_security_group.this[\"apps\"].id",
+      "old_suite": {
+        "passed": true,
+        "summary": {
+          "status": "pass",
+          "passed": 3,
+          "failed": 0,
+          "errored": 0,
+          "skipped": 0
+        }
+      },
+      "expanded_suite": {
+        "passed": false,
+        "summary": {
+          "status": "error",
+          "passed": 4,
+          "failed": 0,
+          "errored": 1,
+          "skipped": 2
+        },
+        "assertion_failure": false,
+        "diagnostics": [
+          {
+            "summary": "Invalid index",
+            "detail": "The given key does not identify an element in this collection value."
+          },
+          {
+            "summary": "Invalid index",
+            "detail": "The given key does not identify an element in this collection value."
+          }
+        ]
+      }
+    },
+    {
+      "case": "return_vnet_ids_in_subnet_output",
+      "path": "modules/network/outputs.tf",
+      "block": "subnet_ids",
+      "attribute": "value",
+      "temporary_replacement": "{ for key, subnet in azurerm_subnet.this : key => azurerm_virtual_network.this.id }",
+      "old_suite": {
+        "passed": true,
+        "summary": {
+          "status": "pass",
+          "passed": 3,
+          "failed": 0,
+          "errored": 0,
+          "skipped": 0
+        }
+      },
+      "expanded_suite": {
+        "passed": false,
+        "summary": {
+          "status": "fail",
+          "passed": 6,
+          "failed": 1,
+          "errored": 0,
+          "skipped": 0
+        },
+        "assertion_failure": true,
+        "diagnostics": [
+          {
+            "summary": "Test assertion failed",
+            "detail": "Each subnet output value must reference the matching resource ID."
+          }
+        ]
+      }
+    }
+  ],
+  "repository_result": {
+    "native_scenarios": 26,
+    "modules": 8,
+    "all_suites_passed": true,
+    "every_module_detected_a_sampled_mutation": true
+  },
+  "limitations": [
+    "The original subnet for_each freeze loses defaults normally supplied by variable type conversion and causes an invalid-control error; it is not counted as detected.",
+    "Six old gaps are rejected by the expanded suite. Three produce only assertion failures; other rejected regressions include configuration/index errors. They are not all classified as strict mutation detection.",
+    "The production verifier independently detects a valid resource-group variable-wiring mutation with an actual assertion failure and no Terraform errors.",
+    "Computed mock IDs are shared per resource type and cannot discriminate every possible cross-instance ID swap; alternate input keys and output key-set assertions address specific hardcoded-key regressions.",
+    "Mocked plans do not establish live Azure connectivity, effective NSG security or complete behavioral coverage."
+  ]
+}
