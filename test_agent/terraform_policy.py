@@ -167,27 +167,29 @@ def provider_schema(schemas, kind, *, data=False):
         require(False, "TYPE_NOT_AVAILABLE_IN_APPROVED_RUNTIME")
 
 
-def computed_defaults(defaults, schema):
+def computed_defaults(defaults, schema, prefix="defaults"):
     require(
         isinstance(defaults, dict) and literal(defaults),
         "MOCK_DEFAULTS_MUST_BE_LITERALS",
     )
     for name, value in defaults.items():
+        field = f"{prefix}.{name}"
         attribute = schema.get("attributes", {}).get(name)
         if attribute:
             require(
                 attribute.get("computed") is True
                 and (not attribute.get("optional") or name == "id")
                 and not attribute.get("required"),
-                "ONLY_COMPUTED_ATTRIBUTES_CAN_BE_MOCKED",
+                f"ONLY_COMPUTED_ATTRIBUTES_CAN_BE_MOCKED: {field}",
             )
         elif name in schema.get("block_types", {}):
-            children = value if isinstance(value, list) else [value]
-            require(bool(children), "EMPTY_MOCK_BLOCK")
-            for child in children:
-                computed_defaults(child, schema["block_types"][name]["block"])
+            require(
+                isinstance(value, dict),
+                f"NESTED_MOCK_DEFAULTS_MUST_BE_OBJECT: {field}; supply one object for all block instances, not a list",
+            )
+            computed_defaults(value, schema["block_types"][name]["block"], field)
         else:
-            require(False, "UNKNOWN_MOCK_ATTRIBUTE")
+            require(False, f"UNKNOWN_MOCK_ATTRIBUTE: {field}")
 
 
 def validate_mocks(data, source, schemas):
@@ -218,6 +220,7 @@ def validate_mocks(data, source, schemas):
                 computed_defaults(
                     config["defaults"],
                     provider_schema(schemas, kind, data=key == "mock_data"),
+                    kind,
                 )
                 # Legacy SDK schemas mark the computed resource ID Optional.
                 # Its exception must never mask an explicitly configured ID.
@@ -307,7 +310,7 @@ def validate_suite(sources, tests, schemas):
             )
             require(
                 0 <= len(assertions) <= 12 and (assertions or failures),
-                "EXPECTED_ASSERTIONS",
+                "EXPECTED_ASSERTIONS: each run allows at most 12 assertions and needs an assertion or a real validation expectation; split checks across runs instead of removing them",
             )
             for failure in failures:
                 match = (

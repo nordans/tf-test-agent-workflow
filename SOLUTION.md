@@ -110,6 +110,9 @@ Mock fields are checked against runtime provider schemas. Configurable attribute
 cannot be mocked. Legacy SDK schemas mark computed IDs Optional; ID mocking is
 allowed only when computed and never when an ID is explicitly configured.
 Nested mock blocks may contain computed fields, such as identity.principal_id.
+Their defaults use one object for all instances, not a list. Rejections identify
+the exact schema field, and authoring receives file/run/assertion limits so it
+can split scenarios while retaining checks.
 Output/computed assertions require explicit plan-time mocks. New module outputs,
 newly added outputs and planned output coverage must have assertions; structural
 repair cannot silently remove that coverage. This checks references, not the
