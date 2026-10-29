@@ -3,6 +3,7 @@
 import json
 import time
 
+from test_agent.behavior import required_booleans, validate_boolean_coverage
 from test_agent.context import (
     AUTHOR_SKILL,
     MAX_FILE_BYTES,
@@ -165,6 +166,9 @@ def draft_one(bundle, module, trusted_root, client, schemas):
                             "required_output_assertions": sorted(
                                 required_outputs(before, after, plan)
                             ),
+                            "required_boolean_assertions": required_booleans(
+                                before, after
+                            ),
                         }
                     )
                 }
@@ -233,6 +237,7 @@ def draft_one(bundle, module, trusted_root, client, schemas):
                     before, after, current, candidate, schemas, previous_sources=after
                 )
                 validate_output_coverage(before, after, suite, plan)
+                validate_boolean_coverage(before, after, suite)
                 accepted = candidate
                 result.edits = {
                     p: text

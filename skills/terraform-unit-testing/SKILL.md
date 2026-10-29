@@ -75,6 +75,21 @@ Cover relevant defaults and caller overrides, empty/populated collections and
 conditional branches. Prefer small representative cases with a clear purpose.
 Implement the planned output-wiring cases as well as resource assertions. Use
 schema-approved computed mocks when an output must be known during plan.
+
+The caller supplies required_boolean_assertions derived from source. Implement
+each as a direct condition = resource.attribute == true/false assertion using the
+specified implemented value. The inventory paths omit instance indices; use the
+actual block's schema-appropriate indexing, or one(block) for a singleton set.
+Assert nested settings as well as top-level ones. Do not satisfy these checks with
+an OR, an unrelated reference, a computed mock or a tautological expression.
+If needed, split default/security checks into two runs rather than dropping flags.
+
+Turn every planned validation example into an expect_failures run with otherwise
+valid inputs. A lower-bound test does not cover an upper bound or integer rule.
+For trimspace/nonempty checks test both empty and whitespace strings. Include
+valid numeric boundaries in passing scenarios. Reconcile actual cases with the
+plan before submitting; runtime success alone does not establish that the plan
+was implemented.
 For empty maps use length(value) == 0 to avoid collection/object type differences.
 Use length checks for empty collections generally; dynamic and typed empty sets
 can compare differently. For nonempty collections, compare normalized values.
@@ -86,6 +101,8 @@ with the same inputs. Retain planned output, security and wiring assertions duri
 structural correction. Do not turn a broad proposal into a smaller one just to
 pass a structural limit. Missing map keys can use lookup or try with a fallback
 so an actual mismatch produces a clear assertion failure rather than an index error.
+For example, prefer lookup(resource.tags, "Environment", "") == "test" to direct
+map indexing when the missing key itself should be an assertion mismatch.
 
 Keep existing run names, inputs, expected validation failures, mock values and
 unrelated conditions. A changed scalar source default may justify updating its

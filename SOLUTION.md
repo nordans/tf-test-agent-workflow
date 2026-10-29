@@ -53,6 +53,14 @@ preservation and structural correction. Paths are existing module tests plus
 tests/generated.tftest.hcl; omitted files remain. The schema supplies computed mock
 fields and limits. Skills guide decisions; Python enforces the boundaries.
 
+The planner receives an inventory of configured literal Boolean properties.
+New or changed properties require direct assertions of their source values,
+including nested blocks; both author and verifier enforce this independently.
+The inventory is limited to 64 properties and omits instance indices. It does
+not establish expression semantics or coverage of every repeated instance.
+Skills require concrete validation boundaries, caller overrides and security
+expectations; arbitrary validation completeness still needs review.
+
 Planner and author each have four requests; one structural planner correction and
 two author proposals are allowed. Runtime assertion failures end autonomous
 authoring. Existing tests are preserved, including inputs and expected failures.
@@ -109,6 +117,10 @@ as detection; invalid configuration and provider/init failures do not. no_change
 is independently executed before it can become no_change_verified.
 Failed native assertions are included as bounded diagnostics in the PR comment.
 When execution contradicts a planner's no_change decision, the comment says so.
+Submitted drafts failing verification remain in a separate unverified.patch;
+proposal.patch contains only independently verified module changes. Mutation
+reports distinguish surviving controls from setup/runtime errors. Attribute paths
+retain nested block names when prioritizing the bounded three-control sample.
 
 [Example PR #20](https://github.com/nordans/tf-test-agent-workflow/pull/20) is kept open.
 It adds a previously unseen Foundry module and changes retention 30 to 60, without

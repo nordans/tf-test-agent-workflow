@@ -10,6 +10,7 @@ import sys
 import tempfile
 from pathlib import Path
 
+from test_agent.behavior import validate_boolean_coverage
 from test_agent.context import AgentError
 from test_agent.gemini import GeminiClient
 from test_agent.github import MARKER, GitHub
@@ -106,6 +107,7 @@ def verify_one(bundle, item, runner):
         validate_output_coverage(
             before, after, suite, item.analysis.plan if item.analysis else None
         )
+        validate_boolean_coverage(before, after, suite)
         if previous:
             report.baseline, _ = runner.execute(before, previous)
             if not report.baseline["passed"]:
@@ -118,7 +120,11 @@ def verify_one(bundle, item, runner):
                 report.existing = {"passed": False, "policy_error": str(error)}
         report.candidate, report.tests = runner.verify(after, candidate)
         if not report.candidate["passed"]:
-            report.reason = "Candidate tests or the bounded source-mutation controls did not pass. See the report artifact."
+            report.reason = (
+                "The candidate suite passed, but the bounded mutation sample did not produce a test assertion failure. Sensitivity remains inconclusive; review the controls."
+                if report.candidate["terraform"]["passed"]
+                else "The candidate test suite did not pass. Review the native diagnostics."
+            )
             return report
         if same_suites(report.tests, existing_formatted):
             if not (report.existing or {}).get("passed"):
@@ -212,6 +218,34 @@ def proposal_patch(bundle, report):
     return "".join(chunks)
 
 
+def unverified_patch(bundle, draft, report):
+    """Keep failed proposals reviewable without granting verification status."""
+    chunks = []
+    for item, result in zip(draft.modules, report.modules, strict=True):
+        if item.status != "proposed" or (
+            report.status != "failed"
+            and result.status in ("verified", "no_change_verified")
+        ):
+            continue
+        current = test_files(bundle.module_files(item.module, "after"), item.module)
+        if set(item.edits) - set(current) - {"tests/generated.tftest.hcl"}:
+            continue
+        for path, content in sorted(item.edits.items()):
+            target = f"modules/{item.module}/{path}"
+            for line in difflib.unified_diff(
+                current.get(path, "").splitlines(keepends=True),
+                content.splitlines(keepends=True),
+                fromfile=f"a/{target}" if path in current else "/dev/null",
+                tofile=f"b/{target}",
+            ):
+                chunks.append(
+                    line
+                    if line.endswith("\n")
+                    else line + "\n\\ No newline at end of file\n"
+                )
+    return "".join(chunks)
+
+
 def literal(text):
     value = html.escape(str(text), quote=False).replace("@", "[at]")
     return re.sub(r"([\\\x60*_\[\]()#!|~])", r"\\\1", value)
@@ -248,6 +282,16 @@ def render_comment(bundle, draft, report, run_id=None):
             )
             if "load_skill" in item.tool_calls:
                 lines.append("Authoring skill: terraform-unit-testing.")
+            if plan.test_cases:
+                lines.append(
+                    "Planned cases: "
+                    + ", ".join(literal(case.name[:80]) for case in plan.test_cases[:6])
+                    + (
+                        "; more in the draft artifact."
+                        if len(plan.test_cases) > 6
+                        else "."
+                    )
+                )
             for finding in plan.findings[:3]:
                 locations = ", ".join(
                     f"{e.revision}:{e.file}:{e.line}" for e in finding.evidence[:2]
@@ -287,6 +331,21 @@ def render_comment(bundle, draft, report, run_id=None):
                         lines.append(
                             "Verifier diagnostic: " + literal(f"{summary}: {detail}")
                         )
+            elif not candidate["mutation"].get("detected"):
+                for control in candidate["mutation"].get("attempts", [])[:3]:
+                    execution = control.get("terraform", {})
+                    outcome = (
+                        "tests still passed"
+                        if execution.get("passed")
+                        else "setup/runtime error; not assertion detection"
+                    )
+                    lines.append(
+                        "Mutation control: "
+                        + literal(str(control.get("description", ""))[:250])
+                        + " - "
+                        + outcome
+                        + "."
+                    )
         if result.status == "no_change_verified":
             lines.append(
                 "No test changes are needed. Existing tests passed independent execution and a source-mutation control."
@@ -294,6 +353,10 @@ def render_comment(bundle, draft, report, run_id=None):
     if proposal_patch(bundle, report):
         lines.append(
             "The pr-result artifact contains a patch for verified modules. Review and apply it to this same PR. Infrastructure was not modified."
+        )
+    if unverified_patch(bundle, draft, report):
+        lines.append(
+            "Unverified test proposal: pr-result/unverified.patch contains the author's draft for modules that did not pass verification. It is separate from proposal.patch. Inspect and correct it before applying; it is not an approved test patch."
         )
     if run_id is not None:
         if not re.fullmatch(r"[0-9]+", run_id):
@@ -365,6 +428,7 @@ def save_result(directory, bundle, draft, report):
     write_json(directory / "report.json", report)
     for name, text in (
         ("proposal.patch", proposal_patch(bundle, report)),
+        ("unverified.patch", unverified_patch(bundle, draft, report)),
         ("comment.md", render_comment(bundle, draft, report)),
     ):
         with (directory / name).open("x", encoding="utf-8", newline="\n") as file:
