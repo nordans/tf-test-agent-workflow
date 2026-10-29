@@ -45,6 +45,11 @@ Stack/root impact warnings do not prevent testing independent changed modules;
 the overall report remains needs_review.
 Script text can be read as source data; it is never executed.
 
+Unchanged module .terraform.lock.hcl files are excluded from model/execution
+snapshots. Tests use the approved runtime's provider locks. Added, modified,
+renamed or deleted module locks require review for that module; other supported
+modules can still be processed. Linked, executable and oversized locks are rejected.
+
 Existing test files, scenarios, inputs, mock values and unrelated assertions are
 preserved. Source-backed scalar equality updates are supported; Boolean
 expectation changes require review. Every provider must be mocked and every run

@@ -115,6 +115,19 @@ newly added outputs and planned output coverage must have assertions; structural
 repair cannot silently remove that coverage. This checks references, not the
 semantic strength of every assertion.
 
+Unchanged direct module .terraform.lock.hcl files are excluded from source/model
+snapshots. Execution always uses the approved runtime locks. Lock additions,
+modifications, renames and removals require review for that module, without
+blocking independent eligible modules. Excluded locks still have blob/mode/size
+checks; they cannot introduce symlinks, executable inputs or unbounded files.
+The publisher preserves the eligibility reason when authoring was skipped instead
+of replacing it with a generic missing-author message.
+
+Some inherited module/stack locks still describe older provider versions. Their
+contents are not used or validated by this test workflow. Deployment dependency
+locks need separate maintenance after provider-constraint changes; the isolated
+tests do not establish deployment lockfile consistency.
+
 The complete existing test suite is preserved. Old runs, inputs, expected
 validation failures and mock values remain; computed defaults may be added.
 Inputs for newly introduced variables may be added. A changed literal scalar

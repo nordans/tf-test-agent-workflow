@@ -385,6 +385,27 @@ def missing_report(bundle, draft):
     )
 
 
+def missing_draft(bundle):
+    reason = "; ".join(bundle.blocking_reasons) or (
+        "The author job produced no result."
+        if bundle.selected_modules
+        else "No Terraform module changes."
+    )
+    return Draft(
+        identity=bundle.identity,
+        bundle_sha256=digest(bundle),
+        reason=reason if not bundle.module_reasons else "",
+        modules=[
+            ModuleDraft(
+                module=module,
+                status="needs_review",
+                reason=bundle.module_reasons.get(module) or reason,
+            )
+            for module in bundle.selected_modules
+        ],
+    )
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -472,19 +493,7 @@ def main():
             draft = (
                 Draft.model_validate(read_json(path))
                 if path.exists()
-                else Draft(
-                    identity=bundle.identity,
-                    bundle_sha256=digest(bundle),
-                    reason="The author job produced no result.",
-                    modules=[
-                        ModuleDraft(
-                            module=m,
-                            status="needs_review",
-                            reason="The author job produced no result.",
-                        )
-                        for m in bundle.selected_modules
-                    ],
-                )
+                else missing_draft(bundle)
             )
         if args.stage in ("local", "verify"):
             if GitRepository(args.repo).collect(bundle.identity) != bundle:
