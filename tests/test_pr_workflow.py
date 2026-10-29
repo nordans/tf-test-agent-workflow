@@ -614,7 +614,7 @@ def test_native_failure_is_reported_in_pr_context_with_escaped_diagnostics(repos
 
 
 def test_no_change_planner_decision_is_not_endorsed_after_native_failure(repository):
-    bundle = changed_bundle(repository)
+    bundle = changed_bundle(repository, applied=True)
     record = analysis()
     record["plan"].update(decision="no_change", test_cases=[])
     item = Draft(
@@ -629,14 +629,18 @@ def test_no_change_planner_decision_is_not_endorsed_after_native_failure(reposit
             )
         ],
     )
-    worker = runner()
+    worker = runner(applied=True)
+    worker.execute.side_effect = [
+        (execution(), {RELTEST: HCL}),
+        (execution(False, True), {RELTEST: UPDATED}),
+    ]
     worker.verify.return_value = (
         {
             "passed": False,
             "terraform": execution(False, True),
             "mutation": {"detected": False},
         },
-        {RELTEST: HCL},
+        {RELTEST: UPDATED},
     )
     report = verify_tests(bundle, item, worker)
     comment = render_comment(bundle, item, report)
