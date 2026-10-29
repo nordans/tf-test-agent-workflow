@@ -1,0 +1,140 @@
+mock_provider "azurerm" {
+  override_during = plan
+  mock_resource "azurerm_kubernetes_cluster" {
+    defaults = {
+      id           = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-test/providers/Microsoft.ContainerService/managedClusters/aks-test"
+      private_fqdn = "aks-test-private.00000000-0000-0000-0000-000000000000.privatelink.westeurope.azmk8s.io"
+      identity = {
+        principal_id = "00000000-0000-0000-0000-000000000001"
+        tenant_id    = "00000000-0000-0000-0000-000000000002"
+      }
+    }
+  }
+}
+
+variables {
+  name                = "aks-test"
+  resource_group_name = "rg-test"
+  location            = "westeurope"
+  dns_prefix          = "aks-dns"
+  tenant_id           = "00000000-0000-0000-0000-000000000002"
+}
+
+run "test_defaults" {
+  command = plan
+
+  assert {
+    condition     = azurerm_kubernetes_cluster.this.default_node_pool[0].node_count == 2
+    error_message = "Default node count should be 2."
+  }
+  assert {
+    condition     = azurerm_kubernetes_cluster.this.default_node_pool[0].vm_size == "Standard_D2s_v5"
+    error_message = "Default VM size should be Standard_D2s_v5."
+  }
+}
+
+run "test_security_configuration" {
+  command = plan
+
+  assert {
+    condition     = azurerm_kubernetes_cluster.this.private_cluster_enabled == true
+    error_message = "Private cluster must be enabled."
+  }
+  assert {
+    condition     = azurerm_kubernetes_cluster.this.private_cluster_public_fqdn_enabled == false
+    error_message = "Private cluster public FQDN must be disabled."
+  }
+  assert {
+    condition     = azurerm_kubernetes_cluster.this.local_account_disabled == true
+    error_message = "Local accounts must be disabled."
+  }
+  assert {
+    condition     = azurerm_kubernetes_cluster.this.role_based_access_control_enabled == true
+    error_message = "RBAC must be enabled."
+  }
+  assert {
+    condition     = azurerm_kubernetes_cluster.this.default_node_pool[0].node_public_ip_enabled == false
+    error_message = "Node public IP must be disabled."
+  }
+  assert {
+    condition     = azurerm_kubernetes_cluster.this.azure_active_directory_role_based_access_control[0].azure_rbac_enabled == true
+    error_message = "Azure RBAC must be enabled."
+  }
+}
+
+run "test_outputs" {
+  command = plan
+
+  assert {
+    condition     = output.id == azurerm_kubernetes_cluster.this.id
+    error_message = "Output id does not match resource id."
+  }
+  assert {
+    condition     = output.private_fqdn == azurerm_kubernetes_cluster.this.private_fqdn
+    error_message = "Output private_fqdn does not match resource private_fqdn."
+  }
+  assert {
+    condition     = output.principal_id == azurerm_kubernetes_cluster.this.identity[0].principal_id
+    error_message = "Output principal_id does not match identity principal_id."
+  }
+}
+
+run "test_validation_name_empty" {
+  command = plan
+  variables { name = "" }
+  expect_failures = [var.name]
+}
+
+run "test_validation_name_whitespace" {
+  command = plan
+  variables { name = "   " }
+  expect_failures = [var.name]
+}
+
+run "test_validation_dns_prefix_empty" {
+  command = plan
+  variables { dns_prefix = "" }
+  expect_failures = [var.dns_prefix]
+}
+
+run "test_validation_dns_prefix_whitespace" {
+  command = plan
+  variables { dns_prefix = "   " }
+  expect_failures = [var.dns_prefix]
+}
+
+run "test_validation_node_count_zero" {
+  command = plan
+  variables { node_count = 0.0 }
+  expect_failures = [var.node_count]
+}
+
+run "test_validation_node_count_six" {
+  command = plan
+  variables { node_count = 6.0 }
+  expect_failures = [var.node_count]
+}
+
+run "test_validation_node_count_fraction" {
+  command = plan
+  variables { node_count = 1.5 }
+  expect_failures = [var.node_count]
+}
+
+run "test_validation_node_count_min_valid" {
+  command = plan
+  variables { node_count = 1 }
+  assert {
+    condition     = azurerm_kubernetes_cluster.this.default_node_pool[0].node_count == 1
+    error_message = "Node count 1 should be valid."
+  }
+}
+
+run "test_validation_node_count_max_valid" {
+  command = plan
+  variables { node_count = 5 }
+  assert {
+    condition     = azurerm_kubernetes_cluster.this.default_node_pool[0].node_count == 5
+    error_message = "Node count 5 should be valid."
+  }
+}
