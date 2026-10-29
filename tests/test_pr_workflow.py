@@ -585,6 +585,70 @@ def test_failed_mutation_cannot_produce_a_verified_patch(repository):
     assert not proposal_patch(bundle, report)
 
 
+def test_native_failure_is_reported_in_pr_context_with_escaped_diagnostics(repository):
+    bundle = changed_bundle(repository)
+    item = draft(bundle)
+    worker = runner()
+    worker.verify.return_value = (
+        {
+            "passed": False,
+            "terraform": {
+                **execution(False, True),
+                "diagnostics": [
+                    {
+                        "summary": "Test assertion failed",
+                        "detail": "Public network access must be disabled. <script>@reviewer",
+                    }
+                ],
+            },
+            "mutation": {"detected": False},
+        },
+        {RELTEST: UPDATED},
+    )
+    report = verify_tests(bundle, item, worker)
+    comment = render_comment(bundle, item, report)
+    assert report.status == "needs_review"
+    assert "Verifier diagnostic: Test assertion failed" in comment
+    assert "Public network access must be disabled" in comment
+    assert "<script>" not in comment and "@reviewer" not in comment
+
+
+def test_no_change_planner_decision_is_not_endorsed_after_native_failure(repository):
+    bundle = changed_bundle(repository, applied=True)
+    record = analysis()
+    record["plan"].update(decision="no_change", test_cases=[])
+    item = Draft(
+        identity=bundle.identity,
+        bundle_sha256=digest(bundle),
+        schema_sha256=SCHEMA_HASH,
+        modules=[
+            ModuleDraft(
+                module=MODULE,
+                status="no_change",
+                analysis=Analysis.model_validate(record),
+            )
+        ],
+    )
+    worker = runner(applied=True)
+    worker.execute.side_effect = [
+        (execution(), {RELTEST: HCL}),
+        (execution(False, True), {RELTEST: UPDATED}),
+    ]
+    worker.verify.return_value = (
+        {
+            "passed": False,
+            "terraform": execution(False, True),
+            "mutation": {"detected": False},
+        },
+        {RELTEST: UPDATED},
+    )
+    report = verify_tests(bundle, item, worker)
+    comment = render_comment(bundle, item, report)
+    assert report.status == "needs_review"
+    assert "no_change decision did not pass independent verification" in comment
+    assert not proposal_patch(bundle, report)
+
+
 def test_head_move_during_comment_lookup_prevents_writing(repository):
     identity = changed_bundle(repository).identity.model_copy(
         update={"origin": "github"}

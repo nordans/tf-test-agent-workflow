@@ -1,288 +1,178 @@
 # Solution
 
-## Scope and decisions
+## Design
 
-The primary interface is a GitHub PR workflow implemented in Python. It discovers
-changed leaf modules under modules/ from Git objects, including modules added in
-the PR, and processes each independently. Module names and AzureRM resource types
-are not enumerated in policy. The approved provider schemas determine resource
-availability and which computed values may be mocked.
+The primary interface is a GitHub PR workflow with a custom Python agent. Python
+selects changed leaf modules from immutable Git objects, assigns tools and paths,
+validates proposals, runs Terraform and publishes results. Gemini chooses test
+cases and proposes HCL; it cannot change its permissions or execution evidence.
+Explicit loops and Pydantic contracts keep this inspectable without a large agent
+framework. The tradeoff is a constrained HCL subset and human review of unsupported
+changes rather than general shell access.
 
-Python owns paths, tool availability, validation, execution and publication.
-Gemini chooses test cases and proposes HCL through bounded tools. This keeps
-execution decisions inspectable. The tradeoff is a deliberately constrained HCL
-subset and explicit human review when the subset cannot handle a change.
+The output is a verified patch for the originating PR. An operator reviews and
+applies it there. There is no automatic commit, merge, extra-PR or infrastructure
+edit tool. Native plan tests use mocked providers and require no Azure credentials;
+live authoring needs a Gemini API key and sends selected source to that vendor.
 
-The output is a verified test patch for the originating PR. An operator reviews
-and applies it there. Infrastructure decisions remain with people. No Git write,
-merge or additional-PR tool is exposed to the agent.
+## Running
 
-The source starts from cf-recruitment/tf-platform-base. Current provider support
-is AzureRM 5.11.0 and the locally rebuilt external 2.4.2+patched.1. New provider
-dependencies require a reviewed runtime update.
-
-## Prerequisites and running
-
-Use Python 3.12, uv 0.13.6, Git, an amd64 Linux Docker engine, Betterleaks 1.9.0,
-a trusted checkout and a Gemini API key. Model calls send selected module source
-to Gemini and consume API quota. Runtime builds and security databases require
-network access; Terraform verification has none.
+Requirements: Python 3.12, uv 0.13.6, Git, Linux amd64 Docker, Betterleaks 1.9.0 and
+GEMINI_API_KEY for model calls. Run uv sync --locked, then
+uv run --locked python -B -m test_agent.build_runtime.
 
 ~~~sh
-uv sync --locked
-uv run --locked python -B -m test_agent.build_runtime
 uv run --locked python -B -m test_agent.pr_workflow local \
-  --repo /path/to/checkout --base BASE_SHA --head HEAD_SHA \
-  --output .agent-output/pr-run
+  --repo /path/to/repo --base BASE_SHA --head HEAD_SHA \
+  --output .agent-output/new-run
 ~~~
 
-Set GEMINI_API_KEY securely in the process environment, never as a command-line
-argument or committed value. Supply full Git commit IDs and a new output directory.
-Use --secret-scanner if Betterleaks is outside PATH. Local execution scans source
-before model calls and writes context.json, draft.json, report.json, proposal.patch
-and comment.md. Its results are marked local and cannot be published by the PR
-publisher.
+Use full SHAs, a new output directory and --secret-scanner if Betterleaks is outside
+PATH. Source is scanned before calls. Local results cannot be published as GitHub
+results. Offline checks are ruff check ., ruff format --check ., python -m pytest,
+python -m test_agent.verify_repository and python -m test_agent.check_modules,
+run through uv run --locked after setup.
 
-On GitHub, configure the GEMINI_API_KEY secret and merge the workflows to main.
-PR test agent runs on same-repository PRs to main; manual workflow_dispatch takes
-a PR number. It skips model calls for fork, bot and draft PRs. Changed controller,
-skill, runtime or workflow code requires review rather than running itself.
+On GitHub, set the repository secret and install workflows on main. PR test agent
+runs automatically or via workflow_dispatch with a PR number on main. Same-repo,
+non-draft, non-bot PRs are eligible; forks do not call Gemini. See README for patch
+review/application. Artifacts expire after seven days; saved example evidence is
+committed separately.
 
-## Agent, skills and execution
+## Agent and reusable skills
 
-The custom agent's analysis instructions are in agent/instructions.md and its
-authoring instructions in agent/pr-writer.md. Registered reusable skills are:
+Analysis instructions are in agent/instructions.md and authoring instructions in
+agent/pr-writer.md. planner.py exposes load_skill, read_module and submit_test_plan.
+The model loads skills/terraform-change-analysis/SKILL.md, inventories behavior and
+coverage, cites real before/after lines and separates implemented behavior from
+proposed infrastructure requirements. Evidence validates location, not reasoning.
 
-- skills/terraform-change-analysis/SKILL.md: inspect before/after sources,
-  inventory behavior and existing coverage, propose evidence-backed cases and
-  findings, separate implemented behavior from desired requirements.
-- skills/terraform-unit-testing/SKILL.md: produce complete native test files,
-  use computed mocks, preserve accepted checks and hand proposals to verification.
+pr_author.py then exposes load_skill, propose_test_files and submit_proposal.
+skills/terraform-unit-testing/SKILL.md covers native mocks, inputs, outputs,
+preservation and structural correction. Paths are existing module tests plus
+tests/generated.tftest.hcl; omitted files remain. The schema supplies computed mock
+fields and limits. Skills guide decisions; Python enforces the boundaries.
 
-planner.py exposes load_skill, read_module and submit_test_plan. Discovery tools
-are usable once; submission is available after discovery. Evidence must identify
-a supplied file and real line. One structural contract correction is allowed,
-within four requests; invalid evidence and unknown tools are rejected.
+Planner and author each have four requests; one structural planner correction and
+two author proposals are allowed. Runtime assertion failures end autonomous
+authoring. Existing tests are preserved, including inputs and expected failures.
+Source-backed scalar equality updates are supported; Boolean expectation changes
+require review. Output coverage cannot be silently dropped during repair. The
+older standalone workspace bootstrap remains for compatibility and is not the
+general PR engine.
 
-pr_author.py runs the planner per module, then exposes load_skill,
-propose_test_files and submit_proposal. It allows two structural proposals within
-four authoring requests. Paths are an enum of that module's existing tests plus
-tests/generated.tftest.hcl. Omitted files stay unchanged; deletion is unsupported.
-A plan proposing infrastructure requirements requires human review.
-Ordinary Terraform assertion failures do not trigger model repair.
+## GitHub workers and security
 
-The earlier standalone planner/bootstrap remains for compatibility. Its
-workspace-only author and HCL policy are not called by the PR workflow; use
-pr_workflow local for general authoring.
+pull_request_target always checks out the trusted workflow commit from main,
+never PR code. Policy/runtime/workflow changes require review before execution.
 
-## Four GitHub workers
+| Worker | Responsibility | Credentials |
+| --- | --- | --- |
+| Prepare | Read PR identity/Git snapshots and scan source before upload | GitHub read |
+| Propose | Read approved schemas, plan and propose tests | GitHub read; Gemini key only in model step |
+| Verify | Reread Git, bind artifacts/schemas, enforce HCL and execute suites | Contents read; no model or write key |
+| Publish | Check identities/stage outcomes and update its marked bot comment | PR write only here; no Terraform execution |
 
-.github/workflows/pr-test-agent.yml uses pull_request_target, checking out the
-trusted workflow commit from main in every worker, never the PR branch.
+Artifacts bind repository, PR, base/head/merge-base and SHA-256 digests. These detect
+mismatches, not compromised-worker forgery. Publication rechecks open state and
+SHAs; a small API race remains after the final check. Comments name analyzed SHAs.
+Concurrency cancels superseded runs, and model text is escaped before publication.
 
-1. Prepare reads PR identity and Git snapshots and scans source before upload.
-   Source is scanned whenever present, even if a module is ineligible for Gemini.
-2. Propose builds the approved runtime for schema checks and calls the agent.
-   Only the model step receives GEMINI_API_KEY. It has no GitHub write permission.
-   Schema queries execute trusted provider binaries without PR source mounted.
-3. Verify independently rereads Git revisions, checks artifact/source/schema
-   digests, validates candidate HCL and executes complete suites and mutations.
-   It receives no model or repository-write credential.
-4. Publish checks identities and stage outcomes, rechecks PR base/head/open state,
-   and updates only its marked github-actions bot comment. Only this worker has
-   pull-requests: write. It executes neither Terraform nor model-generated code.
+The policy allows approved AzureRM/external leaf-module source, pure expressions,
+literal test inputs, computed-only mocks and explicit plan. It rejects unmocked
+providers, apply, aliases/overrides, nested modules, backend/cloud, provisioners and
+filesystem/execution functions. Legacy SDK computed IDs have a narrow exception
+only when not configured in source. Nested block defaults are single objects.
+Unchanged module locks are excluded; changed locks and external programs require
+review for that module. Execution uses runtime locks, not PR-selected packages.
 
-Context, draft and verification artifacts bind the repository, PR, base/head and
-merge-base revisions. SHA-256 digests detect mismatched payloads; they are not
-cryptographic attestations against a compromised worker. Publishing has a residual
-API race after its final identity check; the comment always names analyzed SHAs.
-Concurrency cancels superseded runs. Artifacts expire after seven days.
+Containers have no network, a readonly root/input, UID 65532, dropped capabilities,
+no-new-privileges, CPU/RAM/PID limits and ephemeral noexec tmpfs. Only bounded source,
+tests and approved locks are mounted; scripts, home and Docker socket are absent.
+Docker receives an environment allowlist excluding model, GitHub and Azure secrets.
+Formatting writes only temporary copies. Containers share the host kernel.
 
-## HCL and execution controls
+Budgets are eight modules, 128 changed paths, 32 files/module, 16 KiB/file,
+96 KiB/module and 256 KiB/revision. Model calls stop before further requests after
+64 calls, 250,000 reported tokens or 15 minutes; one response may cross the token
+threshold. A container has 120 seconds/1 MiB output; trusted schema output is capped
+at 64 MiB. Git/API responses and job durations are bounded. Transient API failures
+remain explicit review/rerun outcomes; automatic backoff is a production extension.
 
-terraform_policy.py admits top-level Terraform sources, resources, data, variables,
-locals and outputs for approved providers. Provisioners, connections, provider
-overrides, backend/cloud configuration, nested/remote modules and filesystem,
-environment or execution functions are excluded. Every provider must be mocked
-and every test run must explicitly plan. Inputs and mock defaults are literals.
+## Verification and recorded example
 
-Mock fields are checked against runtime provider schemas. Configurable attributes
-cannot be mocked. Legacy SDK schemas mark computed IDs Optional; ID mocking is
-allowed only when computed and never when an ID is explicitly configured.
-Nested mock blocks may contain computed fields, such as identity.principal_id.
-Their defaults use one object for all instances, not a list. Rejections identify
-the exact schema field, and authoring receives file/run/assertion limits so it
-can split scenarios while retaining checks.
-Output/computed assertions require explicit plan-time mocks. New module outputs,
-newly added outputs and planned output coverage must have assertions; structural
-repair cannot silently remove that coverage. This checks references, not the
-semantic strength of every assertion.
+Success requires exact file/run pairs, complete passing runs, matching nonempty
+summary, no skips/errors and exit zero. The verifier executes the before-source
+baseline when present, existing head tests and the full candidate. It then tries
+at most three temporary source mutations. Only an actual assertion failure counts
+as detection; invalid configuration and provider/init failures do not. no_change
+is independently executed before it can become no_change_verified.
+Failed native assertions are included as bounded diagnostics in the PR comment.
+When execution contradicts a planner's no_change decision, the comment says so.
 
-Unchanged direct module .terraform.lock.hcl files are excluded from source/model
-snapshots. Execution always uses the approved runtime locks. Lock additions,
-modifications, renames and removals require review for that module, without
-blocking independent eligible modules. Excluded locks still have blob/mode/size
-checks; they cannot introduce symlinks, executable inputs or unbounded files.
-The publisher preserves the eligibility reason when authoring was skipped instead
-of replacing it with a generic missing-author message.
+[Example PR #20](https://github.com/nordans/tf-test-agent-workflow/pull/20) is kept open.
+It adds a previously unseen Foundry module and changes retention 30 to 60, without
+merging that infrastructure into main. [Permanent evidence](docs/examples/final-pr.json)
+records actual SHAs, decisions, skills, findings, patches and native results.
 
-Some inherited module/stack locks still describe older provider versions. Their
-contents are not used or validated by this test workflow. Deployment dependency
-locks need separate maintenance after provider-constraint changes; the isolated
-tests do not establish deployment lockfile consistency.
+1. [Initial generation](https://github.com/nordans/tf-test-agent-workflow/actions/runs/40794141055): the new module had no tests and
+   the retention assertion was stale. Both modules received verified proposals.
+   The Foundry suite had five scenarios; retention had three. Terraform CI correctly
+   failed before the patch was applied.
+2. [Reviewed application](https://github.com/nordans/tf-test-agent-workflow/actions/runs/40794895190): the exact GitHub patch was applied
+   in the same PR. Two reviewer tag tests were added separately. Both modules became
+   no_change_verified with an empty patch; all nine module suites passed 33 scenarios.
+   The retention planner still chose update_tests, but its author returned identical
+   content; verification normalized the actual result without hiding the raw plan.
+3. [Negative control](https://github.com/nordans/tf-test-agent-workflow/actions/runs/40796174464): public access was temporarily enabled
+   while the false assertion remained. The model incorrectly chose no_change for
+   Foundry. Independent execution returned needs_review and published the assertion
+   failure and contradiction; no weakening patch was emitted. CI was also red.
+4. [Restored configuration](https://github.com/nordans/tf-test-agent-workflow/actions/runs/40796847735): public access was restored to false
+   in a normal commit. Both modules again became no_change_verified with no patch.
+   [Final Terraform CI](https://github.com/nordans/tf-test-agent-workflow/actions/runs/40796850799) passed all 33 scenarios and all
+   nine sampled-mutation controls. The example remains open and unmerged.
 
-The complete existing test suite is preserved. Old runs, inputs, expected
-validation failures and mock values remain; computed defaults may be added.
-Inputs for newly introduced variables may be added. A changed literal scalar
-source expectation may update its matching equality when the run does not
-override that variable. Boolean expectation changes require review. This limits
-automatic rewrites while allowing new modules and ordinary default changes.
+The first generated Foundry suite missed caller override of its owned tag. A
+targeted reverse-merge regression passed those tests. Two explicit reviewer tests
+now reject it. This demonstrates why verified execution is not semantic completeness.
+Earlier [bootstrap](docs/examples/four-module-bootstrap.json) and
+[network](docs/examples/network-coverage.json) records also retain unsuccessful
+attempts and limitations instead of claiming one-shot autonomous coverage.
 
-suite_runner.py runs all candidate test files together. Success requires the exact
-qualified file/run pairs, completed passing runs, a nonempty matching summary,
-no skips/errors and a successful process exit. Formatting-only proposals become
-no_change_verified after execution.
+Main has eight suites and 26 scenarios; all detect a sampled mutation. Required
+checks are Code quality CI, Workflow validation, Secret scan, Dependency audit and
+Terraform CI. They use pinned actions/tools, Ruff/pytest, Betterleaks, pip-audit,
+offline validation of all modules/stack and Trivy. HIGH/CRITICAL, including unfixed
+findings, fail CI with no suppressions. The recorded image has zero HIGH/CRITICAL
+and four UNKNOWN findings requiring further triage.
 
-The verifier tries at most three temporary source mutations, preferring referenced
-arguments and exercised input variations. It freezes variable wiring to a known
-literal input or flips a configured Boolean. An actual test assertion failure
-counts as detection; a provider crash, init error or invalid configuration does
-not. No detected mutation produces needs_review, including for a no-change plan.
-One detected mutation demonstrates sensitivity, not comprehensive coverage.
+Terraform 1.17.1 and AzureRM 5.11.0 are pinned. external 2.4.2+patched.1 rebuilds
+official pinned source with pinned Go and frozen patched dependencies, provider
+tests and an authenticated local package hash; see runtime/external-build/README.md.
+This is a maintenance obligation until an appropriate official package is available.
 
-Containers run as UID 65532, without network, with read-only root/input, all
-capabilities dropped, no-new-privileges and CPU/RAM/PID limits. Writable storage
-is ephemeral noexec tmpfs. Formatting operates on writable copies in that tmpfs;
-the input mount remains read-only. Terraform CI exercises both runner entry points
-with unformatted inputs. Only bounded Terraform/test snapshots are mounted;
-scripts, home directories and the Docker socket are not. The Docker CLI receives
-an environment allowlist excluding Gemini, GitHub and Azure secrets. Host kernel
-sharing remains a limitation of this boundary.
+## Assumptions and limits
 
-Budgets: eight modules/PR, 128 changed paths, 32 files/module, 16 KiB/file,
-96 KiB/module and 256 KiB/revision. Model stages allow 64 calls total and stop
-further requests after 250,000 reported tokens or 15 minutes. One response can
-cross the token threshold. Jobs have fixed timeouts. Each Terraform container has
-a 120-second/1-MiB output limit. Trusted provider-schema output has a separate
-64-MiB bound. Git calls are bounded and disable hooks, external diffs/textconv,
-replacement objects and credential inheritance.
+The repository, GitHub platform, trusted main and runtime maintainers are trusted.
+Supported source uses a flat modules layout and approved provider schemas. One
+unsupported module does not hide independent results; global policy changes block
+model execution. Stack/root impact is review-only, with separate schema validation.
 
-## Verification and examples
+Mocked tests cannot show Azure acceptance, deployed permissions, connectivity,
+application/script behavior or complete coverage. IDs are shared per mocked type
+and cannot distinguish every cross-instance swap. Variable-freezing controls can
+lose defaults supplied by Terraform type conversion; such invalid controls receive
+no detection credit. Existing inherited deployment locks need separate maintenance;
+the workflow does not validate their consistency with deployment constraints.
 
-Offline checks run Ruff, pytest, Actionlint/ShellCheck, Betterleaks and pip-audit.
-Pinned actions and checksum-verified tools are used. Terraform CI runs all existing
-module suites, requires tests and a detected mutation for changed modules, and
-reports missing tests or undetected mutations in unchanged modules. All eight
-modules have checked-in suites and currently detect a sampled source mutation.
-Passing CI does not mean full repository coverage.
+LLM decisions remain fallible and nondeterministic. Location evidence and structural
+guards do not prove every assertion useful. Larger refactors, new providers,
+dependencies and intended security changes require people. Whole-job timeouts can
+leave modules unfinished; missing verification is never reported as passed.
 
-check_modules.py separately validates all eight modules and the stack against
-offline provider schemas and runs a fixed mocked external smoke test. The runtime
-pins Terraform 1.17.1 by image digest and authenticates provider packages with
-lockfile hashes. Seven modules and the stack require AzureRM 5.x; the workspace
-retains its already tested >= 4.0, < 6.0 constraint. Subnet service endpoint blocks
-were migrated with populated/empty-list assertions. Mocked plans and validation
-do not establish live Azure upgrade safety.
-
-The official external 2.4.2 package introduced HIGH/CRITICAL Go advisories. The
-runtime rebuilds pinned upstream source with pinned Go and frozen patched
-dependencies, checks the rebuilt package hash and runs provider tests. See
-[runtime/external-build/README.md](runtime/external-build/README.md). This adds a
-maintenance obligation until a suitable official package is available.
-Trivy scans the final image and blocks HIGH/CRITICAL, including unfixed findings;
-there are no suppressions. Four previously recorded UNKNOWN findings need
-manual triage. Scanner/database failures also fail checks.
-
-The main ruleset requires Code quality CI, Workflow validation, Secret scan,
-Dependency audit and Terraform CI, from GitHub Actions. PRs are required; force
-pushes/deletion and bypass actors are disabled. Strict up-to-date branch checking
-is disabled. GitHub settings are not copied when cloning this repository.
-
-[PR #10](https://github.com/nordans/tf-test-agent-workflow/pull/10) demonstrated the
-earlier single-module integration: the agent detected a stale retention test,
-published a verified patch and later updated the same comment with
-no_change_verified after application.
-
-The multi-module local example uses a temporary Git history adding an unseen
-Azure AI Search module and changing workspace retention from 30 to 60. Real Gemini
-loads both skills; the independent runner verifies the new suite and updated
-existing suite, then reruns after patch application. The recorded example is in
-[docs/examples/generic-pr-run.json](docs/examples/generic-pr-run.json). It is local
-evidence, not a claim that the new workflow has already run from trusted main.
-Synthetic sources are under tests/fixtures. The actual four-module publication
-path was subsequently verified in [PR #16](https://github.com/nordans/tf-test-agent-workflow/pull/16):
-all modules returned no_change_verified with mutation detection and an empty patch.
-
-The existing data-factory, databricks-workspace, function-app and private-endpoint
-modules were bootstrapped together with real Gemini calls, followed by explicit
-reviewer edits and independent verification. Their 11 new scenarios all passed
-and each suite detected a source mutation. The complete repository then passed
-22 native test runs across eight modules; network's sampled mutation gap remained
-at that checkpoint.
-See [the bootstrap record](docs/examples/four-module-bootstrap.json) for decisions,
-skill/tool usage, failed attempts, review feedback, edits and execution results.
-
-The first unattended batch did not pass: there were omitted outputs, insufficient
-mutation sensitivity, forbidden configurable mock fields and HTTP 429 responses.
-A later attempt exposed readonly copied files preventing formatting; the runner
-fix is isolated in [PR #15](https://github.com/nordans/tf-test-agent-workflow/pull/15).
-Local follow-ups used a paced transport wrapper and human feedback. Review also
-restored assertions removed during a model repair, split them into bounded runs,
-and added missing resource wiring checks. These are assisted, reviewed results,
-not evidence that the agent autonomously produced complete coverage on one try.
-
-Network's original three scenarios used fixed subnet inputs and checked counts,
-names, endpoint presence and CIDR validation. Freezing NSG/association iteration to
-that map still passed. Four added scenarios exercise caller overrides, different
-keys, a third subnet, the empty map, resource references and outputs. Network now
-passes seven scenarios and detects a valid variable-wiring mutation; all eight
-modules pass 26 scenarios and detect a sampled mutation. Six additional controlled
-regressions passed the old suite and are rejected by the expanded suite. Some
-produce configuration errors instead of assertion failures; those are explicitly
-not counted as strict mutation detection. See
-[the network regression record](docs/examples/network-coverage.json).
-
-Computed mock IDs in these network tests are shared per resource type. They verify
-nominal output/reference contracts and key sets, but do not distinguish every
-possible cross-instance ID swap. Alternate caller keys catch hardcoded key names.
-The generic variable-freezing mutator also does not reconstruct defaults supplied
-by Terraform type conversion, such as optional service_endpoints. A control that
-loses such a default can become invalid and is never credited as detected.
-
-Existing configuration still warrants owner review: data-factory,
-databricks-workspace and function-app default public network access to true;
-function-app configures AllAllowed for FTPS and Storage
-Blob Data Owner for its runtime storage role. The agent noted missing tests and
-external/identity dependencies; these additional configuration observations came
-from reviewer inspection. Tests document implemented behavior and do not approve
-the security posture or change infrastructure settings.
-
-## Limits, assumptions and further work
-
-Stack/root impact warnings keep the overall result at needs_review while allowing
-verified patches for independent changed leaf modules. They do not broaden native
-execution to stack code.
-
-The flat modules/ layout and approved provider schemas define execution scope.
-Stack impact analysis, removed modules, external program changes, aliases, nested
-module dependencies and other providers require review. One unsupported module
-does not hide supported module results, but protected policy changes stop model
-execution for the PR. Whole-job timeouts can prevent completion of remaining
-modules; publication then reports missing verification rather than a pass.
-
-Source, diff and model text remain untrusted. Location evidence can be correct
-while reasoning is wrong. Literal-equality updates and mutation heuristics cover
-a useful subset, not arbitrary refactors. Tests cannot prove Azure acceptance,
-effective permissions, service behavior, networking, deployment success or script
-logic. Mocked IDs establish wiring only. Generated tests need human review.
-
-Next work is to confirm the final GitHub infrastructure-change example and review
-remaining coverage gaps, including type-preserving source mutations. Model repair
-needs stronger plan-to-assertion checks and more precise structural diagnostics;
-production transport still needs bounded transient-error handling. With more
-modules/teams/repositories, use dependency impact analysis,
-parallel isolated workers, per-module runtimes and policy ownership, persistent
-progress, stronger artifact attestation and a stronger execution boundary.
-Production extensions include cost/abuse controls, model evaluations for useful
-assertions and security findings, operational metrics and consolidation of the
-legacy bootstrap interface. Keep provider/runtime updates reviewed and scanned.
+For more teams/modules/repositories, add dependency impact analysis, separately
+versioned runtimes, parallel isolated verification, policy ownership and stronger
+artifact attestation. Production work would add a prebuilt scanned/signed runtime,
+bounded API retry/cost controls, metrics, semantic evaluations, type-preserving
+mutations and stronger execution isolation, while consolidating the legacy CLI.

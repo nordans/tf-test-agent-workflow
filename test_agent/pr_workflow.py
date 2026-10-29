@@ -275,6 +275,18 @@ def render_comment(bundle, draft, report, run_id=None):
                     f"Source mutation detected: {candidate['mutation'].get('detected', False)}.",
                 ]
             )
+            if not candidate["terraform"]["passed"]:
+                if item.analysis and item.analysis.plan.decision == "no_change":
+                    lines.append(
+                        "The planner's no_change decision did not pass independent verification."
+                    )
+                for diagnostic in candidate["terraform"].get("diagnostics", [])[:3]:
+                    if isinstance(diagnostic, dict):
+                        summary = str(diagnostic.get("summary", ""))[:200]
+                        detail = str(diagnostic.get("detail", ""))[:600]
+                        lines.append(
+                            "Verifier diagnostic: " + literal(f"{summary}: {detail}")
+                        )
         if result.status == "no_change_verified":
             lines.append(
                 "No test changes are needed. Existing tests passed independent execution and a source-mutation control."
