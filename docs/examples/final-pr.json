@@ -511,7 +511,11 @@
             "tests/generated.tftest.hcl": "e0877fd0a48e4fda0a8931902bd0751622315260e55b228887a7c77d3e3f5d1a"
           }
         }
-      ]
+      ],
+      "saved_patch_files": {
+        "proposal.patch": "docs/examples/retention-initial-verified.patch",
+        "unverified.patch": "docs/examples/aks-initial-unverified.patch"
+      }
     },
     "after_operator_review": {
       "workflow": "https://github.com/nordans/tf-test-agent-workflow/actions/runs/40849967881",

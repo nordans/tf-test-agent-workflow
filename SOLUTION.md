@@ -131,6 +131,10 @@ retain nested block names when prioritizing the bounded three-control sample.
 open and unmerged. It adds a previously unseen private AKS module and changes
 retention 30 to 60 with the old test left intact. [Permanent evidence](docs/examples/final-pr.json)
 retains actual identities, skills/tools, rejections, native results and patch hashes.
+The original [unverified AKS draft](docs/examples/aks-initial-unverified.patch) and
+[verified retention patch](docs/examples/retention-initial-verified.patch) are
+preserved as data for review, tied to the recorded source head; do not apply them
+to a different revision.
 
 1. [Generation](https://github.com/nordans/tf-test-agent-workflow/actions/runs/40847785251):
    the agent authored twelve AKS scenarios and a retention update. Structural
