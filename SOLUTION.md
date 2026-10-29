@@ -127,40 +127,44 @@ proposal.patch contains only independently verified module changes. Mutation
 reports distinguish surviving controls from setup/runtime errors. Attribute paths
 retain nested block names when prioritizing the bounded three-control sample.
 
-[Example PR #24](https://github.com/nordans/tf-test-agent-workflow/pull/24) remains
-open and unmerged. It adds a previously unseen private AKS module and changes
-retention 30 to 60 with the old test left intact. [Permanent evidence](docs/examples/final-pr.json)
-retains actual identities, skills/tools, rejections, native results and patch hashes.
-The original [unverified AKS draft](docs/examples/aks-initial-unverified.patch) and
-[verified retention patch](docs/examples/retention-initial-verified.patch) are
-preserved as data for review, tied to the recorded source head; do not apply them
-to a different revision.
+[Example PR #26](https://github.com/nordans/tf-test-agent-workflow/pull/26) remains
+open and unmerged. It adds previously unseen private AKS and Azure AI Search leaf
+modules with no tests and no stack integration. Its latest bot comment therefore
+shows concrete test proposals rather than an already-applied no_change result.
+[Permanent evidence](docs/examples/final-pr.json) retains actual identities,
+skills/tools, plans, rejections, native results and hashes. The exact
+[verified patch](docs/examples/source-only-verified.patch) is saved as review data,
+tied to the recorded source head; do not apply it to another revision.
 
-1. [Generation](https://github.com/nordans/tf-test-agent-workflow/actions/runs/40847785251):
-   the agent authored twelve AKS scenarios and a retention update. Structural
-   feedback corrected an invalid nested mock. Independent execution then rejected
-   AKS because resource-block list accesses lacked indices. Retention was verified:
-   proposal.patch contained its update; unverified.patch contained the AKS draft.
-   The bot published the actual failure in the originating PR. Initial CI also
-   correctly failed for the missing/stale checked-in tests.
-2. Operator review: commit de05669 applied the exact verified retention patch and
-   corrected six list indices in the agent's AKS draft. Its assertions and inputs
-   were retained. Commit 1d56d61 added two separate reviewer scenarios for caller
-   wiring, empty tags and fixed settings. This participation is recorded explicitly;
-   the result is not claimed as one-shot autonomous success.
-3. [After review](https://github.com/nordans/tf-test-agent-workflow/actions/runs/40849967881):
-   both modules became no_change_verified and both patch artifacts were empty.
-   [Terraform CI](https://github.com/nordans/tf-test-agent-workflow/actions/runs/40849972758)
-   passed 40 scenarios across nine modules and all nine sampled-mutation controls.
-   A separate temporary private-API regression now fails a real assertion; the
-   older six-test draft had allowed that same regression.
+In [the agent run](https://github.com/nordans/tf-test-agent-workflow/actions/runs/40854244587),
+both planners chose add_tests and loaded terraform-change-analysis. Both authors
+loaded terraform-unit-testing and proposed tests/generated.tftest.hcl. Each first
+submitted a list for a nested computed mock; bounded structural feedback corrected
+it to an object. Independent native execution then passed 11 AI Search and 10 AKS
+scenarios, with actual assertion failures from the sampled source mutations.
+Both modules and the combined result are verified; proposal.patch is nonempty
+and unverified.patch is empty. No operator edits were needed for this generation.
 
-Historical [Foundry](docs/examples/foundry-experiment.json),
+The candidate tests remain artifacts, not commits to the PR. Thus
+[ordinary Terraform CI](https://github.com/nordans/tf-test-agent-workflow/actions/runs/40854244567)
+correctly fails with No checked-in tests for those two new modules, while all
+eight existing module suites pass. This expected check failure is separate from
+successful candidate verification. An operator would review/apply the patch to
+this same PR in normal use; the example intentionally stops before that action.
+Passing the bounded checks is not a claim of complete coverage or live Azure
+correctness. Private reviewer notes remain outside the public repository.
+
+The completed [earlier PR #24](https://github.com/nordans/tf-test-agent-workflow/pull/24)
+was closed without merge. Its [archived record](docs/examples/aks-reviewed-example.json)
+retains the initial generation failure, six operator index corrections, two
+reviewer scenarios and the final no_change_verified rerun. Its original
+[unverified AKS draft](docs/examples/aks-initial-unverified.patch) and
+[verified retention update](docs/examples/retention-initial-verified.patch)
+remain historical data. [Foundry](docs/examples/foundry-experiment.json),
 [AKS audit](docs/examples/aks-quality-audit.json),
 [bootstrap](docs/examples/four-module-bootstrap.json) and
-[network](docs/examples/network-coverage.json) records retain unsuccessful attempts
-and reviewer contributions. Experimental PR #20 was closed without merging its
-infrastructure. The final example contains no Foundry changes.
+[network](docs/examples/network-coverage.json) records retain other experiments.
+PR #20 was also closed without merging infrastructure.
 
 Main has eight suites and 26 scenarios; all detect a sampled mutation. Required
 checks are Code quality CI, Workflow validation, Secret scan, Dependency audit and

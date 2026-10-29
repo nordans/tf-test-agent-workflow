@@ -5,11 +5,14 @@ Azure modules in a GitHub pull request. It uses reusable analysis/authoring skil
 approved provider schemas and isolated execution. Results and a test-only patch
 are published to the originating PR for review.
 
-[Example PR](https://github.com/nordans/tf-test-agent-workflow/pull/24) shows a new
-AKS module and an existing retention change, including a failed author draft,
-reviewed corrections and independent execution. Its infrastructure changes remain outside
-main. [Saved evidence](docs/examples/final-pr.json) remains available after Actions
-artifacts expire.
+[Example PR](https://github.com/nordans/tf-test-agent-workflow/pull/26) adds new
+AKS and AI Search modules without tests. The agent proposes and independently
+executes 21 native test scenarios and publishes a verified patch. The PR remains
+source-only so its current comment shows the test proposal; its Terraform CI is
+expected to fail for missing checked-in tests. Generated tests and infrastructure
+stay outside main. [Saved evidence](docs/examples/final-pr.json) and the
+[original verified proposal](docs/examples/source-only-verified.patch) remain
+available after Actions artifacts expire.
 
 ## Requirements
 
