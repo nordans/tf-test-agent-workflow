@@ -26,6 +26,18 @@ Use override_during = plan when computed values are needed in plan assertions.
 The PR caller supplies schema-derived computed_mock_fields. Mock only these
 fields, using valid deterministic IDs when downstream resources parse an ID.
 For nested identity blocks, mock computed principal_id or tenant_id, never type.
+For a nested block, defaults must contain one object applied to all instances,
+not a list. For example, inside a schema-approved mock_resource defaults object:
+
+~~~hcl
+identity = {
+  principal_id = "00000000-0000-0000-0000-000000000001"
+  tenant_id    = "00000000-0000-0000-0000-000000000002"
+}
+~~~
+
+Use this shape only when these fields appear in computed_mock_fields for the
+actual resource. Keep configured identity.type in the module and assert it.
 Do not mock configurable behavior such as SKU, tags, TLS or public network flags.
 For external data, mock its computed result map including every referenced key.
 Its configured program must never execute. Mocked results do not test the script.
@@ -64,7 +76,16 @@ conditional branches. Prefer small representative cases with a clear purpose.
 Implement the planned output-wiring cases as well as resource assertions. Use
 schema-approved computed mocks when an output must be known during plan.
 For empty maps use length(value) == 0 to avoid collection/object type differences.
+Use length checks for empty collections generally; dynamic and typed empty sets
+can compare differently. For nonempty collections, compare normalized values.
 Use expect_failures only for validations actually present in the module.
+
+The caller supplies limits. Use at most 12 assertions per run and 12 runs per file.
+If related checks exceed the per-run limit, split them into additional named runs
+with the same inputs. Retain planned output, security and wiring assertions during
+structural correction. Do not turn a broad proposal into a smaller one just to
+pass a structural limit. Missing map keys can use lookup or try with a fallback
+so an actual mismatch produces a clear assertion failure rather than an index error.
 
 Keep existing run names, inputs, expected validation failures, mock values and
 unrelated conditions. A changed scalar source default may justify updating its

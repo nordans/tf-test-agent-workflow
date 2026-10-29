@@ -156,6 +156,12 @@ def draft_one(bundle, module, trusted_root, client, schemas):
                             "source_data": context.module_data(),
                             "allowed_test_paths": allowed_paths,
                             "computed_mock_fields": hints,
+                            "limits": {
+                                "test_files": 8,
+                                "runs_per_file": 12,
+                                "assertions_per_run": 12,
+                                "bytes_per_test_file": MAX_FILE_BYTES,
+                            },
                             "required_output_assertions": sorted(
                                 required_outputs(before, after, plan)
                             ),
