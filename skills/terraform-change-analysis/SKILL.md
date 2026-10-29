@@ -24,6 +24,22 @@ Inventory inputs, defaults, validations, resource arguments, conditional or repe
 resources, and outputs. Derive existing coverage from assertions, not filenames or
 the presence of a test directory.
 
+Use configured_boolean_properties as a source-derived inventory, including nested
+resource blocks. For every newly added or changed configured Boolean, plan an
+explicit assertion of the implemented value. Group related flags in a security
+case without hiding individual expectations. A private API, disabled local
+authentication, RBAC and node exposure are distinct behaviors when present; do
+not claim security coverage merely because a mock supplies an ID or endpoint.
+
+For each implemented validation, list concrete invalid examples and the exact
+variable that should fail. For bounded integers include below-minimum,
+above-maximum and fractional values; for trimspace/nonempty validation include
+both empty and whitespace-only strings. Cover relevant valid boundaries too.
+Do not say "out of range and non-integer" while proposing only one invalid value.
+Keep cases within the caller's budget by grouping their description, not omitting
+the examples. Preserve the distinction between source validation and provider
+validation; do not invent rejection rules absent from the source.
+
 New modules may have no before files and no tests. Plan tests of their implemented
 behavior without assuming a known module name or resource type. The caller handles
 each changed module separately; do not request another module or commands. Scripts
@@ -42,6 +58,9 @@ file and line. Combine closely related checks rather than listing every attribut
 For overrides, give representative concrete input values and expected outcomes.
 Keep the summary consistent with the actual cases; do not promise checks omitted
 from the case list.
+Before submission, reconcile the proposed cases with configured Boolean values,
+validation examples, representative caller overrides and outputs. State any
+remaining gap precisely instead of claiming that a module is fully covered.
 
 Separate implemented behavior from desired improvements. For example, an input of
 type `number` without a validation block does not imply that the module rejects

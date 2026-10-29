@@ -46,7 +46,8 @@ uv run --locked python -B -m test_agent.pr_workflow local \
 
 Use a new output directory. Add --secret-scanner /path/to/betterleaks if needed.
 The command scans source before model calls and saves context.json, draft.json,
-report.json, proposal.patch and comment.md. Local execution never posts to GitHub.
+report.json, proposal.patch, unverified.patch and comment.md. Local execution never
+posts to GitHub.
 Selected source is sent to Gemini and consumes the API project's quota.
 
 ## GitHub use
@@ -60,6 +61,10 @@ The agent reads immutable before/after source, loads its skills, proposes allowe
 test files and independently verifies complete module suites plus source mutations.
 It updates one marked bot comment. The pr-result artifact contains the report and
 patch; artifacts expire after seven days.
+The last bounded draft rejected by author policy or verification remains in
+unverified.patch separately, with rejection diagnostics in draft.json. It may
+contain invalid HCL and is not approved for application. The comment distinguishes native test failures
+from inconclusive sampled mutation controls and links to the run's artifacts.
 
 Compare the comment's head SHA with your branch, inspect the patch and run
 git apply --check before applying it. Commit reviewed tests to that same PR and
@@ -79,6 +84,12 @@ warnings do not prevent independent leaf-module test proposals. Script changes
 require review; script text is never executed. Unchanged module lockfiles are
 excluded from snapshots, and lockfile changes require review for that module.
 
+New or changed literal Boolean properties, including nested ones, require direct
+assertions matching their configured values. The inventory is bounded to 64
+properties; expressions and arbitrary semantic coverage remain review concerns.
+Recognized nonempty-text and simple numeric validation rules also require concrete
+invalid examples and, where fully understood, passing numeric boundaries. Complex
+conditions remain subject to review; this is not a general HCL constraint solver.
 Existing scenarios, inputs, mocks and unrelated assertions are preserved. Supported
 scalar expectation updates must follow the source change; Boolean rewrites require
 review. Changed controller, skills, runtime or workflow code is not executed by

@@ -53,6 +53,17 @@ preservation and structural correction. Paths are existing module tests plus
 tests/generated.tftest.hcl; omitted files remain. The schema supplies computed mock
 fields and limits. Skills guide decisions; Python enforces the boundaries.
 
+The planner receives an inventory of configured literal Boolean properties.
+New or changed properties require direct assertions of their source values,
+including nested blocks; both author and verifier enforce this independently.
+The inventory is limited to 64 properties and omits instance indices. It does
+not establish expression semantics or coverage of every repeated instance.
+Skills require concrete validation boundaries, caller overrides and security
+expectations. Python checks concrete inputs for recognized nonempty-text and
+conjunctive numeric-bound/integer validations, including invalid examples and
+valid numeric boundaries. Alternatives and unknown clauses are not treated as
+understood constraints; arbitrary validation completeness still needs review.
+
 Planner and author each have four requests; one structural planner correction and
 two author proposals are allowed. Runtime assertion failures end autonomous
 authoring. Existing tests are preserved, including inputs and expected failures.
@@ -93,7 +104,8 @@ Docker receives an environment allowlist excluding model, GitHub and Azure secre
 Formatting writes only temporary copies. Containers share the host kernel.
 
 Budgets are eight modules, 128 changed paths, 32 files/module, 16 KiB/file,
-96 KiB/module and 256 KiB/revision. Model calls stop before further requests after
+96 KiB/module and 256 KiB/revision. Test files allow 16 runs and 12 assertions per
+run; recognized validation inventories allow 32 examples. Model calls stop before further requests after
 64 calls, 250,000 reported tokens or 15 minutes; one response may cross the token
 threshold. A container has 120 seconds/1 MiB output; trusted schema output is capped
 at 64 MiB. Git/API responses and job durations are bounded. Transient API failures
@@ -109,6 +121,11 @@ as detection; invalid configuration and provider/init failures do not. no_change
 is independently executed before it can become no_change_verified.
 Failed native assertions are included as bounded diagnostics in the PR comment.
 When execution contradicts a planner's no_change decision, the comment says so.
+The last path/size-bounded draft rejected by policy or verification remains in
+unverified.patch, with at most two bounded rejection diagnostics in draft.json;
+proposal.patch contains only independently verified module changes. Mutation
+reports distinguish surviving controls from setup/runtime errors. Attribute paths
+retain nested block names when prioritizing the bounded three-control sample.
 
 [Example PR #20](https://github.com/nordans/tf-test-agent-workflow/pull/20) is kept open.
 It adds a previously unseen Foundry module and changes retention 30 to 60, without

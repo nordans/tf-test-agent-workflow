@@ -3,6 +3,7 @@
 import json
 import time
 
+from test_agent.behavior import required_booleans, validate_required_coverage
 from test_agent.context import (
     AUTHOR_SKILL,
     MAX_FILE_BYTES,
@@ -19,13 +20,14 @@ from test_agent.pr_results import (
     same_test_content,
 )
 from test_agent.terraform_policy import (
+    MAX_RUNS,
     provider_schema,
     required_outputs,
     test_files,
-    validate_output_coverage,
     validate_sources,
     validate_update,
 )
+from test_agent.validation_cases import required_validation_examples
 
 
 class BudgetedClient:
@@ -158,12 +160,18 @@ def draft_one(bundle, module, trusted_root, client, schemas):
                             "computed_mock_fields": hints,
                             "limits": {
                                 "test_files": 8,
-                                "runs_per_file": 12,
+                                "runs_per_file": MAX_RUNS,
                                 "assertions_per_run": 12,
                                 "bytes_per_test_file": MAX_FILE_BYTES,
                             },
                             "required_output_assertions": sorted(
                                 required_outputs(before, after, plan)
+                            ),
+                            "required_boolean_assertions": required_booleans(
+                                before, after
+                            ),
+                            "required_validation_examples": required_validation_examples(
+                                before, after
                             ),
                         }
                     )
@@ -227,13 +235,17 @@ def draft_one(bundle, module, trusted_root, client, schemas):
                             "Proposal contains an invalid path, duplicate or oversized file."
                         )
                     edits[file["path"]] = file["content"]
+                # Paths and byte sizes have passed. Retain only the last draft;
+                # its text is data for review, never permission to execute it.
+                result.rejected_edits = dict(edits)
                 candidate = {**current, **edits}
                 suite = validate_update(before, after, old_tests, candidate, schemas)
                 validate_update(
                     before, after, current, candidate, schemas, previous_sources=after
                 )
-                validate_output_coverage(before, after, suite, plan)
+                validate_required_coverage(before, after, suite, plan)
                 accepted = candidate
+                result.rejected_edits = {}
                 result.edits = {
                     p: text
                     for p, text in edits.items()
@@ -242,8 +254,9 @@ def draft_one(bundle, module, trusted_root, client, schemas):
                 tool_result = {"accepted": True, "changed_files": sorted(result.edits)}
                 result.reason = ""
             except AgentError as error:
-                result.reason = str(error)
-                tool_result = {"accepted": False, "error": str(error)}
+                result.reason = str(error)[:1000]
+                result.rejection_reasons.append(result.reason)
+                tool_result = {"accepted": False, "error": str(error)[:1000]}
         else:
             if args != {}:
                 raise AgentError(
@@ -295,7 +308,9 @@ def draft_tests(bundle, trusted_root, client, schemas=None, schema_sha256=None):
             )
         except AgentError as error:
             result.modules.append(
-                ModuleDraft(module=module, status="needs_review", reason=str(error))
+                ModuleDraft(
+                    module=module, status="needs_review", reason=str(error)[:1000]
+                )
             )
         except (ValueError, TypeError, KeyError, IndexError):
             result.modules.append(

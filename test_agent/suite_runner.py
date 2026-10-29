@@ -6,8 +6,7 @@ import re
 import tempfile
 from pathlib import Path
 
-import hcl2
-
+from test_agent.behavior import normalize_reference, resource_attributes
 from test_agent.context import AgentError, read_text, sha256_text
 from test_agent.sandbox import decode_events, run_container, runtime_id
 from test_agent.terraform_policy import (
@@ -121,9 +120,12 @@ def source_mutations(files, suite):
         global_values = {
             k: v for values in data.get("variables", []) for k, v in values.items()
         }
-        inputs.update(global_values)
         for run in data["run"]:
             body = next(iter(run.values()))
+            # Rejected validation inputs do not exercise resource wiring. Counting
+            # them as caller variations gave constant positive inputs false priority.
+            if body.get("expect_failures"):
+                continue
             effective = {
                 **defaults,
                 **global_values,
@@ -145,60 +147,48 @@ def source_mutations(files, suite):
         for body in run.values()
         for a in body.get("assert", [])
     )
-    for path, text in sorted(files.items()):
-        if not path.endswith(".tf"):
-            continue
-        tree = hcl2.parses_to_tree(text)
-        for block in tree.find_data("block"):
-            if str(block.children[0].children[0]) != "resource":
-                continue
-            kind, resource_name = (
-                text[node.meta.start_pos : node.meta.end_pos].strip('"')
-                for node in block.children[1:3]
+    conditions = normalize_reference(re.sub(r'"(?:[^"\\]|\\.)*"', '""', conditions))
+    for attribute in resource_attributes(files):
+        path, address, key = attribute.file, attribute.address, attribute.path
+        snippet = attribute.expression
+        variable = re.fullmatch(r"var\.([A-Za-z_][A-Za-z0-9_]*)", snippet)
+        if variable and variable[1] in inputs and literal(inputs[variable[1]]):
+            name = variable[1]
+            replacement = json.dumps(defaults.get(name, inputs[name]))
+            if key == "for_each" and isinstance(defaults.get(name, inputs[name]), list):
+                replacement = f"toset({replacement})"
+            priority = 0 if len(variants.get(name, set())) > 1 else 1
+            description = (
+                f"Freeze {key} wiring from var.{name} to a known literal input."
             )
-            address = f"{kind}.{resource_name}"
-            for attribute in block.find_data("attribute"):
-                key = str(attribute.children[0].children[0])
-                expression = attribute.children[2]
-                snippet = text[expression.meta.start_pos : expression.meta.end_pos]
-                variable = re.fullmatch(r"var\.([A-Za-z_][A-Za-z0-9_]*)", snippet)
-                if variable and variable[1] in inputs and literal(inputs[variable[1]]):
-                    name = variable[1]
-                    replacement = json.dumps(defaults.get(name, inputs[name]))
-                    if key == "for_each" and isinstance(
-                        defaults.get(name, inputs[name]), list
-                    ):
-                        replacement = f"toset({replacement})"
-                    priority = 0 if len(variants.get(name, set())) > 1 else 1
-                    description = (
-                        f"Freeze {key} wiring from var.{name} to a known literal input."
-                    )
-                elif snippet in ("true", "false"):
-                    replacement = "false" if snippet == "true" else "true"
-                    priority, description = 2, f"Flip configured Boolean {key}."
-                else:
-                    continue
-                location = (path, expression.meta.start_pos, expression.meta.end_pos)
-                if location in seen:
-                    continue
-                seen.add(location)
-                mutated = dict(files)
-                mutated[path] = text[: location[1]] + replacement + text[location[2] :]
-                referenced = f"{address}.{key}" in conditions or (
-                    key in ("for_each", "count") and address in conditions
-                )
-                candidates.append(
-                    (
-                        (0 if referenced else 1, priority),
-                        path,
-                        location[1],
-                        description,
-                        mutated,
-                    )
-                )
-    for _, path, _, description, mutated in sorted(
+        elif snippet in ("true", "false"):
+            replacement = "false" if snippet == "true" else "true"
+            priority, description = 2, f"Flip configured Boolean {key}."
+        else:
+            continue
+        location = (path, attribute.start, attribute.end)
+        if location in seen:
+            continue
+        seen.add(location)
+        referenced = attribute.reference in conditions or (
+            key in ("for_each", "count") and address in conditions
+        )
+        candidates.append(
+            (
+                (0 if referenced else 1, priority),
+                path,
+                attribute.start,
+                description,
+                attribute.end,
+                replacement,
+            )
+        )
+    for _, path, start, description, end, replacement in sorted(
         candidates, key=lambda item: item[:3]
     )[:3]:
+        mutated = dict(files)
+        text = files[path]
+        mutated[path] = text[:start] + replacement + text[end:]
         yield path, description, mutated
 
 

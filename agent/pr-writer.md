@@ -14,6 +14,12 @@ Never remove or weaken an assertion to obtain a pass. Desired infrastructure
 requirements are findings for humans, not tests of implemented behavior.
 Required output assertions are supplied by Python. Retain them when correcting
 setup: computed-value errors require plan-time mocks, not removal of output tests.
+Python also supplies required Boolean comparisons for new or changed configured
+flags, including nested blocks. Implement their exact source values with direct
+assertions. Do not discard validation examples or caller overrides during repair.
+For recognized source validation rules, Python supplies required input examples.
+Use every value with its specified valid/invalid outcome; keep all categories
+when correcting a rejected proposal. Shared top-level variables avoid repetition.
 
 Use the supplied provider-schema hints to mock computed values only. Every
 provider must be mocked; runs must explicitly use plan. Never execute a script.
