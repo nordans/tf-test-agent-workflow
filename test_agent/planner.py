@@ -2,6 +2,7 @@
 
 from pydantic import ValidationError
 
+from test_agent.behavior import boolean_properties
 from test_agent.context import SKILL_NAME, AgentError, AnalysisContext
 from test_agent.gemini import MODEL
 from test_agent.models import TestPlan
@@ -95,6 +96,10 @@ def run_planner(context: AnalysisContext, client) -> dict:
                         "The module tool accepts only the caller-selected module."
                     )
                 result = context.module_data()
+                result["configured_boolean_properties"] = [
+                    {"attribute": reference, "expected": value}
+                    for reference, value in boolean_properties(context.files)
+                ]
             else:
                 try:
                     plan = TestPlan.model_validate(args)

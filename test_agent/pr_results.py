@@ -2,7 +2,7 @@
 
 import json
 from pathlib import Path
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import Field, model_validator
 
@@ -62,6 +62,10 @@ class ModuleDraft(StrictModel):
     status: Literal["proposed", "no_change", "needs_review", "skipped"]
     analysis: Analysis | None = None
     edits: dict[str, str] = Field(default_factory=dict)
+    rejected_edits: dict[str, str] = Field(default_factory=dict)
+    rejection_reasons: list[Annotated[str, Field(max_length=1000)]] = Field(
+        default_factory=list, max_length=2
+    )
     tool_calls: list[str] = Field(default_factory=list, max_length=4)
     usage: dict[str, int] = Field(default_factory=dict)
     policy: dict[str, str] = Field(default_factory=dict)
@@ -70,6 +74,9 @@ class ModuleDraft(StrictModel):
     @model_validator(mode="after")
     def check_module(self):
         check_tests(self.edits)
+        check_tests(self.rejected_edits)
+        if self.rejected_edits and self.status != "needs_review":
+            raise ValueError("Rejected test contents require needs_review status.")
         if self.analysis is not None and self.analysis.module != self.module:
             raise ValueError("Analysis targets a different module.")
         if (self.status == "proposed") != bool(self.edits):

@@ -1,0 +1,391 @@
+{
+  "experiment": "https://github.com/nordans/tf-test-agent-workflow/pull/20",
+  "source_head": "a9a11c873b884bfb78f79c644c9d894c5197ff21",
+  "original_workflow": "https://github.com/nordans/tf-test-agent-workflow/actions/runs/40838593995",
+  "before": {
+    "status": "needs_review",
+    "native_summary": {
+      "status": "pass",
+      "passed": 6,
+      "failed": 0,
+      "errored": 0,
+      "skipped": 0
+    },
+    "controls": {
+      "executed": true,
+      "detected": false,
+      "attempts": [
+        {
+          "path": "modules/aks/main.tf",
+          "description": "Freeze name wiring from var.name to a known literal input.",
+          "detected": false,
+          "terraform": {
+            "passed": true,
+            "stage": "test",
+            "runs": [
+              {
+                "file": "tests/generated.tftest.hcl",
+                "name": "default_configuration",
+                "status": "pass"
+              },
+              {
+                "file": "tests/generated.tftest.hcl",
+                "name": "caller_overrides",
+                "status": "pass"
+              },
+              {
+                "file": "tests/generated.tftest.hcl",
+                "name": "validation_name_blank",
+                "status": "pass"
+              },
+              {
+                "file": "tests/generated.tftest.hcl",
+                "name": "validation_dns_prefix_blank",
+                "status": "pass"
+              },
+              {
+                "file": "tests/generated.tftest.hcl",
+                "name": "validation_node_count_range",
+                "status": "pass"
+              },
+              {
+                "file": "tests/generated.tftest.hcl",
+                "name": "output_wiring",
+                "status": "pass"
+              }
+            ],
+            "summary": {
+              "status": "pass",
+              "passed": 6,
+              "failed": 0,
+              "errored": 0,
+              "skipped": 0
+            },
+            "assertion_failure": false,
+            "diagnostics": []
+          }
+        },
+        {
+          "path": "modules/aks/main.tf",
+          "description": "Freeze tags wiring from var.tags to a known literal input.",
+          "detected": false,
+          "terraform": {
+            "passed": false,
+            "stage": "test",
+            "runs": [
+              {
+                "file": "tests/generated.tftest.hcl",
+                "name": "default_configuration",
+                "status": "pass"
+              },
+              {
+                "file": "tests/generated.tftest.hcl",
+                "name": "caller_overrides",
+                "status": "error"
+              },
+              {
+                "file": "tests/generated.tftest.hcl",
+                "name": "validation_name_blank",
+                "status": "skip"
+              },
+              {
+                "file": "tests/generated.tftest.hcl",
+                "name": "validation_dns_prefix_blank",
+                "status": "skip"
+              },
+              {
+                "file": "tests/generated.tftest.hcl",
+                "name": "validation_node_count_range",
+                "status": "skip"
+              },
+              {
+                "file": "tests/generated.tftest.hcl",
+                "name": "output_wiring",
+                "status": "skip"
+              }
+            ],
+            "summary": {
+              "status": "error",
+              "passed": 1,
+              "failed": 0,
+              "errored": 1,
+              "skipped": 4
+            },
+            "assertion_failure": false,
+            "diagnostics": [
+              {
+                "summary": "Invalid index",
+                "detail": "The given key does not identify an element in this collection value."
+              }
+            ]
+          }
+        },
+        {
+          "path": "modules/aks/main.tf",
+          "description": "Freeze dns_prefix wiring from var.dns_prefix to a known literal input.",
+          "detected": false,
+          "terraform": {
+            "passed": true,
+            "stage": "test",
+            "runs": [
+              {
+                "file": "tests/generated.tftest.hcl",
+                "name": "default_configuration",
+                "status": "pass"
+              },
+              {
+                "file": "tests/generated.tftest.hcl",
+                "name": "caller_overrides",
+                "status": "pass"
+              },
+              {
+                "file": "tests/generated.tftest.hcl",
+                "name": "validation_name_blank",
+                "status": "pass"
+              },
+              {
+                "file": "tests/generated.tftest.hcl",
+                "name": "validation_dns_prefix_blank",
+                "status": "pass"
+              },
+              {
+                "file": "tests/generated.tftest.hcl",
+                "name": "validation_node_count_range",
+                "status": "pass"
+              },
+              {
+                "file": "tests/generated.tftest.hcl",
+                "name": "output_wiring",
+                "status": "pass"
+              }
+            ],
+            "summary": {
+              "status": "pass",
+              "passed": 6,
+              "failed": 0,
+              "errored": 0,
+              "skipped": 0
+            },
+            "assertion_failure": false,
+            "diagnostics": []
+          }
+        }
+      ]
+    }
+  },
+  "extra_security_probe": {
+    "change": "Temporarily disable private_cluster_enabled while retaining the proposed tests.",
+    "original_tests_passed": true,
+    "regression_tests_passed": true,
+    "repository_changed": false
+  },
+  "audited_controller_replay": {
+    "scope": "Same historical draft, locally replayed without another LLM call.",
+    "missing_boolean_checks": [
+      {
+        "attribute": "azurerm_kubernetes_cluster.this.azure_active_directory_role_based_access_control.azure_rbac_enabled",
+        "expected": true
+      },
+      {
+        "attribute": "azurerm_kubernetes_cluster.this.default_node_pool.node_public_ip_enabled",
+        "expected": false
+      },
+      {
+        "attribute": "azurerm_kubernetes_cluster.this.local_account_disabled",
+        "expected": true
+      },
+      {
+        "attribute": "azurerm_kubernetes_cluster.this.private_cluster_enabled",
+        "expected": true
+      },
+      {
+        "attribute": "azurerm_kubernetes_cluster.this.private_cluster_public_fqdn_enabled",
+        "expected": false
+      },
+      {
+        "attribute": "azurerm_kubernetes_cluster.this.role_based_access_control_enabled",
+        "expected": true
+      }
+    ],
+    "guard_rejection": "HCL policy rejected proposal: CONFIGURED_BOOLEAN_ASSERTIONS_MISSING: azurerm_kubernetes_cluster.this.azure_active_directory_role_based_access_control.azure_rbac_enabled == true; azurerm_kubernetes_cluster.this.default_node_pool.node_public_ip_enabled == false; azurerm_kubernetes_cluster.this.local_account_disabled == true; azurerm_kubernetes_cluster.this.private_cluster_enabled == true; azurerm_kubernetes_cluster.this.private_cluster_public_fqdn_enabled == false; azurerm_kubernetes_cluster.this.role_based_access_control_enabled == true.",
+    "sensitivity_only": {
+      "image_id": "sha256:62471846105048c6f0094f664438d36fd0d01d349543ac6bcd2b4b9ea2e07fb9",
+      "terraform": {
+        "passed": true,
+        "stage": "test",
+        "runs": [
+          {
+            "file": "tests/generated.tftest.hcl",
+            "name": "default_configuration",
+            "status": "pass"
+          },
+          {
+            "file": "tests/generated.tftest.hcl",
+            "name": "caller_overrides",
+            "status": "pass"
+          },
+          {
+            "file": "tests/generated.tftest.hcl",
+            "name": "validation_name_blank",
+            "status": "pass"
+          },
+          {
+            "file": "tests/generated.tftest.hcl",
+            "name": "validation_dns_prefix_blank",
+            "status": "pass"
+          },
+          {
+            "file": "tests/generated.tftest.hcl",
+            "name": "validation_node_count_range",
+            "status": "pass"
+          },
+          {
+            "file": "tests/generated.tftest.hcl",
+            "name": "output_wiring",
+            "status": "pass"
+          }
+        ],
+        "summary": {
+          "status": "pass",
+          "passed": 6,
+          "failed": 0,
+          "errored": 0,
+          "skipped": 0
+        },
+        "assertion_failure": false,
+        "diagnostics": []
+      },
+      "mutation": {
+        "executed": true,
+        "detected": true,
+        "attempts": [
+          {
+            "path": "modules/aks/main.tf",
+            "description": "Freeze default_node_pool.node_count wiring from var.node_count to a known literal input.",
+            "detected": true,
+            "terraform": {
+              "passed": false,
+              "stage": "test",
+              "runs": [
+                {
+                  "file": "tests/generated.tftest.hcl",
+                  "name": "default_configuration",
+                  "status": "pass"
+                },
+                {
+                  "file": "tests/generated.tftest.hcl",
+                  "name": "caller_overrides",
+                  "status": "fail"
+                },
+                {
+                  "file": "tests/generated.tftest.hcl",
+                  "name": "validation_name_blank",
+                  "status": "pass"
+                },
+                {
+                  "file": "tests/generated.tftest.hcl",
+                  "name": "validation_dns_prefix_blank",
+                  "status": "pass"
+                },
+                {
+                  "file": "tests/generated.tftest.hcl",
+                  "name": "validation_node_count_range",
+                  "status": "pass"
+                },
+                {
+                  "file": "tests/generated.tftest.hcl",
+                  "name": "output_wiring",
+                  "status": "pass"
+                }
+              ],
+              "summary": {
+                "status": "fail",
+                "passed": 5,
+                "failed": 1,
+                "errored": 0,
+                "skipped": 0
+              },
+              "assertion_failure": true,
+              "diagnostics": [
+                {
+                  "summary": "Test assertion failed",
+                  "detail": "Node count override failed."
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "passed": true,
+      "suite_sha256": "57eaa362a29b744aef688c82815593e54b34951a2be1b40a52e09372c108f3d5"
+    },
+    "full_pr_accepted": false
+  },
+  "development_live_calls": [
+    {
+      "controller_change": "Boolean guards, nested sampler and skills; before validation-example guard",
+      "status": "verified",
+      "modules": [
+        {
+          "module": "aks",
+          "status": "verified",
+          "reason": ""
+        },
+        {
+          "module": "log-analytics-workspace",
+          "status": "verified",
+          "reason": ""
+        }
+      ]
+    },
+    {
+      "controller_change": "Added concrete validation-example guard",
+      "status": "needs_review",
+      "modules": [
+        {
+          "module": "aks",
+          "status": "needs_review",
+          "reason": "HCL policy rejected proposal: EXPECTED_FAILURE_MUST_REFERENCE_VALIDATION."
+        },
+        {
+          "module": "log-analytics-workspace",
+          "status": "verified",
+          "reason": ""
+        }
+      ]
+    },
+    {
+      "controller_change": "Improved unquoted expected-failure diagnostics",
+      "status": "needs_review",
+      "modules": [
+        {
+          "module": "aks",
+          "status": "needs_review",
+          "reason": "HCL policy rejected proposal: EXPECTED_TEST_RUNS."
+        },
+        {
+          "module": "log-analytics-workspace",
+          "status": "verified",
+          "reason": ""
+        }
+      ]
+    },
+    {
+      "controller_change": "Increased bounded file run cap from 12 to 16",
+      "status": "needs_review",
+      "modules": [
+        {
+          "module": "aks",
+          "status": "needs_review",
+          "reason": "HCL policy rejected proposal: INVALID_TEST_INPUTS."
+        },
+        {
+          "module": "log-analytics-workspace",
+          "status": "verified",
+          "reason": ""
+        }
+      ]
+    }
+  ],
+  "interpretation": "These local development calls followed different controller changes, not identical-model benchmark trials. Passing native execution or one mutation does not prove completeness. The Boolean/validation gates remain mandatory; rejected bounded author drafts are now retained separately for review. No model upgrade or infrastructure deployment was used."
+}

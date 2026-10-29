@@ -10,6 +10,7 @@ import sys
 import tempfile
 from pathlib import Path
 
+from test_agent.behavior import validate_required_coverage
 from test_agent.context import AgentError
 from test_agent.gemini import GeminiClient
 from test_agent.github import MARKER, GitHub
@@ -31,7 +32,6 @@ from test_agent.sandbox import docker_environment
 from test_agent.suite_runner import SuiteRunner
 from test_agent.terraform_policy import (
     test_files,
-    validate_output_coverage,
     validate_update,
 )
 
@@ -103,7 +103,7 @@ def verify_one(bundle, item, runner):
         validate_update(
             before, after, existing, candidate, runner.schemas, previous_sources=after
         )
-        validate_output_coverage(
+        validate_required_coverage(
             before, after, suite, item.analysis.plan if item.analysis else None
         )
         if previous:
@@ -118,7 +118,11 @@ def verify_one(bundle, item, runner):
                 report.existing = {"passed": False, "policy_error": str(error)}
         report.candidate, report.tests = runner.verify(after, candidate)
         if not report.candidate["passed"]:
-            report.reason = "Candidate tests or the bounded source-mutation controls did not pass. See the report artifact."
+            report.reason = (
+                "The candidate suite passed, but the bounded mutation sample did not produce a test assertion failure. Sensitivity remains inconclusive; review the controls."
+                if report.candidate["terraform"]["passed"]
+                else "The candidate test suite did not pass. Review the native diagnostics."
+            )
             return report
         if same_suites(report.tests, existing_formatted):
             if not (report.existing or {}).get("passed"):
@@ -131,7 +135,7 @@ def verify_one(bundle, item, runner):
             report.status = "verified"
         report.reason = ""
     except AgentError as error:
-        report.status, report.reason = "needs_review", str(error)
+        report.status, report.reason = "needs_review", str(error)[:2000]
     return report
 
 
@@ -212,6 +216,35 @@ def proposal_patch(bundle, report):
     return "".join(chunks)
 
 
+def unverified_patch(bundle, draft, report):
+    """Keep failed proposals reviewable without granting verification status."""
+    chunks = []
+    for item, result in zip(draft.modules, report.modules, strict=True):
+        edits = item.edits or item.rejected_edits
+        if not edits or (
+            report.status != "failed"
+            and result.status in ("verified", "no_change_verified")
+        ):
+            continue
+        current = test_files(bundle.module_files(item.module, "after"), item.module)
+        if set(edits) - set(current) - {"tests/generated.tftest.hcl"}:
+            continue
+        for path, content in sorted(edits.items()):
+            target = f"modules/{item.module}/{path}"
+            for line in difflib.unified_diff(
+                current.get(path, "").splitlines(keepends=True),
+                content.splitlines(keepends=True),
+                fromfile=f"a/{target}" if path in current else "/dev/null",
+                tofile=f"b/{target}",
+            ):
+                chunks.append(
+                    line
+                    if line.endswith("\n")
+                    else line + "\n\\ No newline at end of file\n"
+                )
+    return "".join(chunks)
+
+
 def literal(text):
     value = html.escape(str(text), quote=False).replace("@", "[at]")
     return re.sub(r"([\\\x60*_\[\]()#!|~])", r"\\\1", value)
@@ -248,6 +281,16 @@ def render_comment(bundle, draft, report, run_id=None):
             )
             if "load_skill" in item.tool_calls:
                 lines.append("Authoring skill: terraform-unit-testing.")
+            if plan.test_cases:
+                lines.append(
+                    "Planned cases: "
+                    + ", ".join(literal(case.name[:80]) for case in plan.test_cases[:6])
+                    + (
+                        "; more in the draft artifact."
+                        if len(plan.test_cases) > 6
+                        else "."
+                    )
+                )
             for finding in plan.findings[:3]:
                 locations = ", ".join(
                     f"{e.revision}:{e.file}:{e.line}" for e in finding.evidence[:2]
@@ -259,6 +302,10 @@ def render_comment(bundle, draft, report, run_id=None):
                 lines.append("Additional findings are retained in the draft artifact.")
         if result.reason:
             lines.append(literal(result.reason[:1000]))
+        if item.rejection_reasons:
+            lines.append(
+                f"Author policy rejections: {len(item.rejection_reasons)}. Bounded diagnostics are retained in draft.json."
+            )
         for label, execution in (
             ("Before-source tests", result.baseline),
             ("Existing head tests", result.existing),
@@ -287,6 +334,21 @@ def render_comment(bundle, draft, report, run_id=None):
                         lines.append(
                             "Verifier diagnostic: " + literal(f"{summary}: {detail}")
                         )
+            elif not candidate["mutation"].get("detected"):
+                for control in candidate["mutation"].get("attempts", [])[:3]:
+                    execution = control.get("terraform", {})
+                    outcome = (
+                        "tests still passed"
+                        if execution.get("passed")
+                        else "setup/runtime error; not assertion detection"
+                    )
+                    lines.append(
+                        "Mutation control: "
+                        + literal(str(control.get("description", ""))[:250])
+                        + " - "
+                        + outcome
+                        + "."
+                    )
         if result.status == "no_change_verified":
             lines.append(
                 "No test changes are needed. Existing tests passed independent execution and a source-mutation control."
@@ -294,6 +356,10 @@ def render_comment(bundle, draft, report, run_id=None):
     if proposal_patch(bundle, report):
         lines.append(
             "The pr-result artifact contains a patch for verified modules. Review and apply it to this same PR. Infrastructure was not modified."
+        )
+    if unverified_patch(bundle, draft, report):
+        lines.append(
+            "Unverified test proposal: pr-result/unverified.patch contains the last bounded author draft rejected by policy or independent verification. It is separate from proposal.patch. The draft may contain invalid HCL; inspect and correct it before applying. It is not an approved test patch."
         )
     if run_id is not None:
         if not re.fullmatch(r"[0-9]+", run_id):
@@ -365,6 +431,7 @@ def save_result(directory, bundle, draft, report):
     write_json(directory / "report.json", report)
     for name, text in (
         ("proposal.patch", proposal_patch(bundle, report)),
+        ("unverified.patch", unverified_patch(bundle, draft, report)),
         ("comment.md", render_comment(bundle, draft, report)),
     ):
         with (directory / name).open("x", encoding="utf-8", newline="\n") as file:
