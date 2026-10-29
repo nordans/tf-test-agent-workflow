@@ -16,7 +16,7 @@ variable "location" {
 variable "retention_in_days" {
   description = "How long logs are kept."
   type        = number
-  default     = 30
+  default     = 60
 }
 
 variable "tags" {
